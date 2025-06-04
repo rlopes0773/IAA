@@ -34,3 +34,4 @@ function createDidDocument(did, publicKey) {
     };
 }
 exports.createDidDocument = createDidDocument;
+//# sourceMappingURL=documentLoader.js.map

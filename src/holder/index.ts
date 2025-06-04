@@ -7,9 +7,9 @@ export class Holder {
         this.presentation = new Presentation();
     }
 
-    async createPresentation(credential: any, challenge?: string) {
+    async createPresentation(credentials: any[], challenge?: string, holderDid?: string) {
         console.log('Holder creating presentation...');
-        return await this.presentation.createPresentation(credential, challenge);
+        return await this.presentation.createPresentation(credentials, challenge, holderDid);
     }
 }
 

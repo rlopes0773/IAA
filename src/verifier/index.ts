@@ -14,6 +14,11 @@ export class Verifier {
         this.keyManager = new KeyManager();
     }
 
+    // Add the missing verify method that app.ts expects
+    async verify(presentation: any, options: any = {}): Promise<any> {
+        return this.verifyPresentation(presentation, options);
+    }
+
     async verifyPresentation(presentation: any, options: any = {}): Promise<any> {
         console.log('Starting comprehensive presentation verification...');
         

@@ -24,3 +24,4 @@ function verifySignature(publicKey, data, signature) {
     return verify.verify(publicKey, signature, 'hex');
 }
 exports.verifySignature = verifySignature;
+//# sourceMappingURL=crypto.js.map

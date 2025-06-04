@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,12 +9,11 @@ class Holder {
     constructor() {
         this.presentation = new presentation_1.default();
     }
-    createPresentation(credential, challenge) {
-        return __awaiter(this, void 0, void 0, function* () {
-            console.log('Holder creating presentation...');
-            return yield this.presentation.createPresentation(credential, challenge);
-        });
+    async createPresentation(credentials, challenge, holderDid) {
+        console.log('Holder creating presentation...');
+        return await this.presentation.createPresentation(credentials, challenge, holderDid);
     }
 }
 exports.Holder = Holder;
 exports.default = Holder;
+//# sourceMappingURL=index.js.map

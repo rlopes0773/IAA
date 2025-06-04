@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Verifier = void 0;
 const vc_1 = require("@digitalbazaar/vc");
@@ -20,142 +11,140 @@ class Verifier {
         this.revocationRegistry = revocationRegistry;
         this.keyManager = new keyManager_1.KeyManager();
     }
-    verifyPresentation(presentation, options = {}) {
-        return __awaiter(this, void 0, void 0, function* () {
-            console.log('Starting comprehensive presentation verification...');
-            const verificationResult = {
-                verified: false,
-                presentationId: presentation.id,
-                revoked: false,
-                checks: {
-                    structure: false,
-                    signature: false,
-                    challenge: false,
-                    credentials: false,
-                    expiration: false,
-                    revocation: false
-                },
-                errors: [],
-                warnings: []
-            };
-            try {
-                // 1. VERIFICAÇÃO ESTRUTURAL
-                const structureCheck = this.validateStructure(presentation);
-                verificationResult.checks.structure = structureCheck.valid;
-                if (!structureCheck.valid) {
-                    verificationResult.errors.push(...structureCheck.errors);
-                }
-                // 2. VERIFICAÇÃO DE REVOGAÇÃO
-                const revocationCheck = this.checkRevocationStatus(presentation.id);
-                verificationResult.checks.revocation = !revocationCheck.revoked;
-                verificationResult.revoked = revocationCheck.revoked;
-                if (revocationCheck.revoked) {
-                    verificationResult.errors.push('Presentation has been revoked');
-                    return verificationResult; // Para aqui se foi revogada
-                }
-                // 3. VERIFICAÇÃO CRIPTOGRÁFICA USANDO DIGITAL BAZAAR
-                const cryptoCheck = yield this.verifyPresentationCryptographically(presentation, options);
-                verificationResult.checks.signature = cryptoCheck.verified;
-                if (!cryptoCheck.verified) {
-                    verificationResult.errors.push(...(cryptoCheck.errors || []));
-                }
-                // 4. VERIFICAÇÃO DAS CREDENCIAIS USANDO DIGITAL BAZAAR
-                const credentialsCheck = yield this.validateCredentialsCryptographically(presentation.verifiableCredential);
-                verificationResult.checks.credentials = credentialsCheck.valid;
-                if (!credentialsCheck.valid) {
-                    verificationResult.errors.push(...credentialsCheck.errors);
-                }
-                verificationResult.warnings.push(...credentialsCheck.warnings);
-                // 5. VERIFICAÇÃO DE CHALLENGE
-                const challengeCheck = this.validateChallenge(presentation, options.expectedChallenge);
-                verificationResult.checks.challenge = challengeCheck.valid;
-                if (!challengeCheck.valid) {
-                    verificationResult.errors.push(...challengeCheck.errors);
-                }
-                // 6. VERIFICAÇÃO DE EXPIRAÇÃO
-                const expirationCheck = this.validateExpiration(presentation);
-                verificationResult.checks.expiration = expirationCheck.valid;
-                if (!expirationCheck.valid) {
-                    verificationResult.errors.push(...expirationCheck.errors);
-                }
-                // RESULTADO FINAL
-                verificationResult.verified = Object.values(verificationResult.checks).every(check => check === true);
-                console.log('Verification completed:', verificationResult);
-                return verificationResult;
-            }
-            catch (error) {
-                verificationResult.errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
-                return verificationResult;
-            }
-        });
+    // Add the missing verify method that app.ts expects
+    async verify(presentation, options = {}) {
+        return this.verifyPresentation(presentation, options);
     }
-    verifyPresentationCryptographically(presentation, options = {}) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                // Create the suite for verification
-                const suite = new data_integrity_1.DataIntegrityProof({
-                    cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
-                });
-                // Verify the presentation using Digital Bazaar
-                const result = yield (0, vc_1.verifyPresentation)({
-                    presentation,
-                    suite,
-                    challenge: options.expectedChallenge,
-                    documentLoader: (0, security_document_loader_1.securityLoader)().build()
-                });
-                return {
-                    verified: result.verified,
-                    errors: result.error ? [result.error.message] : []
-                };
+    async verifyPresentation(presentation, options = {}) {
+        console.log('Starting comprehensive presentation verification...');
+        const verificationResult = {
+            verified: false,
+            presentationId: presentation.id,
+            revoked: false,
+            checks: {
+                structure: false,
+                signature: false,
+                challenge: false,
+                credentials: false,
+                expiration: false,
+                revocation: false
+            },
+            errors: [],
+            warnings: []
+        };
+        try {
+            // 1. VERIFICAÇÃO ESTRUTURAL
+            const structureCheck = this.validateStructure(presentation);
+            verificationResult.checks.structure = structureCheck.valid;
+            if (!structureCheck.valid) {
+                verificationResult.errors.push(...structureCheck.errors);
             }
-            catch (error) {
-                return {
-                    verified: false,
-                    errors: [`Cryptographic verification failed: ${error instanceof Error ? error.message : String(error)}`]
-                };
+            // 2. VERIFICAÇÃO DE REVOGAÇÃO
+            const revocationCheck = this.checkRevocationStatus(presentation.id);
+            verificationResult.checks.revocation = !revocationCheck.revoked;
+            verificationResult.revoked = revocationCheck.revoked;
+            if (revocationCheck.revoked) {
+                verificationResult.errors.push('Presentation has been revoked');
+                return verificationResult; // Para aqui se foi revogada
             }
-        });
+            // 3. VERIFICAÇÃO CRIPTOGRÁFICA USANDO DIGITAL BAZAAR
+            const cryptoCheck = await this.verifyPresentationCryptographically(presentation, options);
+            verificationResult.checks.signature = cryptoCheck.verified;
+            if (!cryptoCheck.verified) {
+                verificationResult.errors.push(...(cryptoCheck.errors || []));
+            }
+            // 4. VERIFICAÇÃO DAS CREDENCIAIS USANDO DIGITAL BAZAAR
+            const credentialsCheck = await this.validateCredentialsCryptographically(presentation.verifiableCredential);
+            verificationResult.checks.credentials = credentialsCheck.valid;
+            if (!credentialsCheck.valid) {
+                verificationResult.errors.push(...credentialsCheck.errors);
+            }
+            verificationResult.warnings.push(...credentialsCheck.warnings);
+            // 5. VERIFICAÇÃO DE CHALLENGE
+            const challengeCheck = this.validateChallenge(presentation, options.expectedChallenge);
+            verificationResult.checks.challenge = challengeCheck.valid;
+            if (!challengeCheck.valid) {
+                verificationResult.errors.push(...challengeCheck.errors);
+            }
+            // 6. VERIFICAÇÃO DE EXPIRAÇÃO
+            const expirationCheck = this.validateExpiration(presentation);
+            verificationResult.checks.expiration = expirationCheck.valid;
+            if (!expirationCheck.valid) {
+                verificationResult.errors.push(...expirationCheck.errors);
+            }
+            // RESULTADO FINAL
+            verificationResult.verified = Object.values(verificationResult.checks).every(check => check === true);
+            console.log('Verification completed:', verificationResult);
+            return verificationResult;
+        }
+        catch (error) {
+            verificationResult.errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
+            return verificationResult;
+        }
     }
-    validateCredentialsCryptographically(credentials) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const errors = [];
-            const warnings = [];
-            if (!Array.isArray(credentials) || credentials.length === 0) {
-                errors.push('No valid credentials found in the presentation');
-                return { valid: false, errors, warnings };
-            }
+    async verifyPresentationCryptographically(presentation, options = {}) {
+        try {
             // Create the suite for verification
             const suite = new data_integrity_1.DataIntegrityProof({
                 cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
             });
-            for (let i = 0; i < credentials.length; i++) {
-                const credential = credentials[i];
-                try {
-                    // Verify each credential using Digital Bazaar
-                    const result = yield (0, vc_1.verifyCredential)({
-                        credential,
-                        suite,
-                        documentLoader: (0, security_document_loader_1.securityLoader)().build()
-                    });
-                    if (!result.verified) {
-                        errors.push(`Credential ${i} cryptographic verification failed`);
-                        if (result.error) {
-                            errors.push(`Credential ${i} error: ${result.error.message}`);
-                        }
-                    }
-                    // Additional checks for credential structure and expiration
-                    const structureCheck = this.validateCredentialStructure(credential, i);
-                    if (!structureCheck.valid) {
-                        errors.push(...structureCheck.errors);
-                    }
-                    warnings.push(...structureCheck.warnings);
-                }
-                catch (error) {
-                    errors.push(`Credential ${i} verification failed: ${error instanceof Error ? error.message : String(error)}`);
-                }
-            }
-            return { valid: errors.length === 0, errors, warnings };
+            // Verify the presentation using Digital Bazaar
+            const result = await (0, vc_1.verifyPresentation)({
+                presentation,
+                suite,
+                challenge: options.expectedChallenge,
+                documentLoader: (0, security_document_loader_1.securityLoader)().build()
+            });
+            return {
+                verified: result.verified,
+                errors: result.error ? [result.error.message] : []
+            };
+        }
+        catch (error) {
+            return {
+                verified: false,
+                errors: [`Cryptographic verification failed: ${error instanceof Error ? error.message : String(error)}`]
+            };
+        }
+    }
+    async validateCredentialsCryptographically(credentials) {
+        const errors = [];
+        const warnings = [];
+        if (!Array.isArray(credentials) || credentials.length === 0) {
+            errors.push('No valid credentials found in the presentation');
+            return { valid: false, errors, warnings };
+        }
+        // Create the suite for verification
+        const suite = new data_integrity_1.DataIntegrityProof({
+            cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
         });
+        for (let i = 0; i < credentials.length; i++) {
+            const credential = credentials[i];
+            try {
+                // Verify each credential using Digital Bazaar
+                const result = await (0, vc_1.verifyCredential)({
+                    credential,
+                    suite,
+                    documentLoader: (0, security_document_loader_1.securityLoader)().build()
+                });
+                if (!result.verified) {
+                    errors.push(`Credential ${i} cryptographic verification failed`);
+                    if (result.error) {
+                        errors.push(`Credential ${i} error: ${result.error.message}`);
+                    }
+                }
+                // Additional checks for credential structure and expiration
+                const structureCheck = this.validateCredentialStructure(credential, i);
+                if (!structureCheck.valid) {
+                    errors.push(...structureCheck.errors);
+                }
+                warnings.push(...structureCheck.warnings);
+            }
+            catch (error) {
+                errors.push(`Credential ${i} verification failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+        return { valid: errors.length === 0, errors, warnings };
     }
     validateCredentialStructure(credential, index) {
         const errors = [];
@@ -241,9 +230,8 @@ class Verifier {
         };
     }
     validateChallenge(presentation, expectedChallenge) {
-        var _a;
         const errors = [];
-        if (!((_a = presentation.proof) === null || _a === void 0 ? void 0 : _a.challenge)) {
+        if (!presentation.proof?.challenge) {
             errors.push('Missing challenge in proof');
             return { valid: false, errors };
         }
@@ -265,17 +253,16 @@ class Verifier {
         return { valid: errors.length === 0, errors };
     }
     // Method for verifying with additional context
-    verifyPresentationWithContext(presentation, context) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.verifyPresentation(presentation, context);
-            // Additional context-based checks
-            if (context.expectedHolder && presentation.holder !== context.expectedHolder) {
-                result.errors.push(`Holder mismatch. Expected: ${context.expectedHolder}, Got: ${presentation.holder}`);
-                result.verified = false;
-            }
-            return result;
-        });
+    async verifyPresentationWithContext(presentation, context) {
+        const result = await this.verifyPresentation(presentation, context);
+        // Additional context-based checks
+        if (context.expectedHolder && presentation.holder !== context.expectedHolder) {
+            result.errors.push(`Holder mismatch. Expected: ${context.expectedHolder}, Got: ${presentation.holder}`);
+            result.verified = false;
+        }
+        return result;
     }
 }
 exports.Verifier = Verifier;
 exports.default = Verifier;
+//# sourceMappingURL=index.js.map

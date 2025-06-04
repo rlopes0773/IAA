@@ -1,0 +1,1 @@
+{"version":3,"file":"registry.d.ts","sourceRoot":"","sources":["../../src/revocation/registry.ts"],"names":[],"mappings":"AAAA,cAAM,kBAAkB;IACpB,OAAO,CAAC,oBAAoB,CAAc;;IAM1C,MAAM,CAAC,cAAc,EAAE,MAAM,GAAG,IAAI;IAIpC,SAAS,CAAC,cAAc,EAAE,MAAM,GAAG,OAAO;CAG7C;AAED,eAAe,kBAAkB,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../src/revocation/index.ts"],"names":[],"mappings":"AAAA,qBAAa,kBAAkB;IAC3B,OAAO,CAAC,oBAAoB,CAAc;;IAM1C,kBAAkB,CAAC,IAAI,EAAE;QAAE,cAAc,EAAE,MAAM,CAAA;KAAE,GAAG,GAAG;IAUzD,eAAe,CAAC,cAAc,EAAE,MAAM,GAAG,GAAG;IAS5C,SAAS,CAAC,cAAc,EAAE,MAAM,GAAG,OAAO;IAI1C,uBAAuB,IAAI,MAAM,EAAE;CAGtC;AAED,eAAe,kBAAkB,CAAC"}

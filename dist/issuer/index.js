@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Issuer = void 0;
 const vc_1 = require("@digitalbazaar/vc");
@@ -20,58 +11,55 @@ class Issuer {
         this.keyManager = new keyManager_1.KeyManager();
         this.issuerDid = 'did:example:issuer123';
     }
-    issueCredential(subject, type, additionalData = {}) {
-        return __awaiter(this, void 0, void 0, function* () {
-            console.log(`Issuing credential for ${subject} of type ${type}`);
-            // Generate or get issuer key pair
-            const keyPair = yield this.keyManager.generateIssuerKeyPair();
-            // Create the credential
-            const credential = yield this.createCredentialData(Object.assign({ subject,
-                type }, additionalData));
-            // Sign the credential using Digital Bazaar
-            const signedCredential = yield this.signCredential(credential, keyPair);
+    async issueCredential(subject, type, additionalData = {}) {
+        console.log(`Issuing credential for ${subject} of type ${type}`);
+        // Generate or get issuer key pair
+        const keyPair = await this.keyManager.generateIssuerKeyPair();
+        // Create the credential
+        const credential = await this.createCredentialData({
+            subject,
+            type,
+            ...additionalData
+        });
+        // Sign the credential using Digital Bazaar
+        const signedCredential = await this.signCredential(credential, keyPair);
+        return signedCredential;
+    }
+    async createCredentialData(data) {
+        const credentialId = `credential-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        const credential = {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://w3id.org/security/data-integrity/v2"
+            ],
+            id: credentialId,
+            type: ["VerifiableCredential", data.type || "CustomCredential"],
+            issuer: this.issuerDid,
+            issuanceDate: new Date().toISOString(),
+            expirationDate: this.calculateExpirationDate(data.type),
+            credentialSubject: this.buildCredentialSubject(data)
+        };
+        return credential;
+    }
+    async signCredential(credential, keyPair) {
+        try {
+            // Create the suite for signing
+            const suite = new data_integrity_1.DataIntegrityProof({
+                signer: keyPair.signer(),
+                cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
+            });
+            // Sign the credential
+            const signedCredential = await (0, vc_1.issue)({
+                credential,
+                suite,
+                documentLoader: (0, security_document_loader_1.securityLoader)().build()
+            });
             return signedCredential;
-        });
-    }
-    createCredentialData(data) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const credentialId = `credential-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-            const credential = {
-                "@context": [
-                    "https://www.w3.org/2018/credentials/v1",
-                    "https://w3id.org/security/data-integrity/v2"
-                ],
-                id: credentialId,
-                type: ["VerifiableCredential", data.type || "CustomCredential"],
-                issuer: this.issuerDid,
-                issuanceDate: new Date().toISOString(),
-                expirationDate: this.calculateExpirationDate(data.type),
-                credentialSubject: this.buildCredentialSubject(data)
-            };
-            return credential;
-        });
-    }
-    signCredential(credential, keyPair) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                // Create the suite for signing
-                const suite = new data_integrity_1.DataIntegrityProof({
-                    signer: keyPair.signer(),
-                    cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
-                });
-                // Sign the credential
-                const signedCredential = yield (0, vc_1.issue)({
-                    credential,
-                    suite,
-                    documentLoader: (0, security_document_loader_1.securityLoader)().build()
-                });
-                return signedCredential;
-            }
-            catch (error) {
-                console.error('Error signing credential:', error);
-                throw new Error(`Failed to sign credential: ${error instanceof Error ? error.message : String(error)}`);
-            }
-        });
+        }
+        catch (error) {
+            console.error('Error signing credential:', error);
+            throw new Error(`Failed to sign credential: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
     buildCredentialSubject(data) {
         const baseSubject = {
@@ -81,14 +69,38 @@ class Issuer {
         // Estruturas específicas por tipo de credencial
         switch (data.type) {
             case 'UniversityDegree':
-                return Object.assign(Object.assign({}, baseSubject), { degree: data.degree || 'Bachelor', university: data.university || 'Unknown University', graduationDate: data.graduationDate || new Date().toISOString(), gpa: data.gpa || null, major: data.major || 'Computer Science', honors: data.honors || false });
+                return {
+                    ...baseSubject,
+                    degree: data.degree || 'Bachelor',
+                    university: data.university || 'Unknown University',
+                    graduationDate: data.graduationDate || new Date().toISOString(),
+                    gpa: data.gpa || null,
+                    major: data.major || 'Computer Science',
+                    honors: data.honors || false
+                };
             case 'DriverLicense':
-                return Object.assign(Object.assign({}, baseSubject), { licenseNumber: data.licenseNumber || this.generateLicenseNumber(), licenseClass: data.licenseClass || 'B', issuingState: data.issuingState || 'CA', dateOfBirth: data.dateOfBirth || '1990-01-01', restrictions: data.restrictions || [], endorsements: data.endorsements || [] });
+                return {
+                    ...baseSubject,
+                    licenseNumber: data.licenseNumber || this.generateLicenseNumber(),
+                    licenseClass: data.licenseClass || 'B',
+                    issuingState: data.issuingState || 'CA',
+                    dateOfBirth: data.dateOfBirth || '1990-01-01',
+                    restrictions: data.restrictions || [],
+                    endorsements: data.endorsements || []
+                };
             case 'Certificate':
-                return Object.assign(Object.assign({}, baseSubject), { certificateName: data.certificateName || 'Professional Certificate', issuer: data.certificateIssuer || 'Certification Body', skillsValidated: data.skillsValidated || [], certificationLevel: data.certificationLevel || 'Professional' });
+                return {
+                    ...baseSubject,
+                    certificateName: data.certificateName || 'Professional Certificate',
+                    issuer: data.certificateIssuer || 'Certification Body',
+                    skillsValidated: data.skillsValidated || [],
+                    certificationLevel: data.certificationLevel || 'Professional'
+                };
             default:
-                return Object.assign(Object.assign({}, baseSubject), data // Fallback para campos genéricos
-                );
+                return {
+                    ...baseSubject,
+                    ...data // Fallback para campos genéricos
+                };
         }
     }
     calculateExpirationDate(type) {
@@ -117,3 +129,4 @@ class Issuer {
 }
 exports.Issuer = Issuer;
 exports.default = Issuer;
+//# sourceMappingURL=index.js.map
