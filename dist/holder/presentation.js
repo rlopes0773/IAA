@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -33,59 +10,75 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Presentation = void 0;
-const crypto = __importStar(require("crypto"));
+const vc_1 = require("@digitalbazaar/vc");
+const data_integrity_1 = require("@digitalbazaar/data-integrity");
+const ecdsa_rdfc_2019_cryptosuite_1 = require("@digitalbazaar/ecdsa-rdfc-2019-cryptosuite");
+const security_document_loader_1 = require("@digitalbazaar/security-document-loader");
+const keyManager_1 = require("../utils/keyManager");
 class Presentation {
     constructor() {
-        // Construtor sem parâmetros
+        this.keyManager = new keyManager_1.KeyManager();
     }
     createPresentation(credentials, challenge, holderDid) {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             console.log(`Creating verifiable presentation with ${credentials.length} credentials...`);
             const holder = holderDid || ((_b = (_a = credentials[0]) === null || _a === void 0 ? void 0 : _a.credentialSubject) === null || _b === void 0 ? void 0 : _b.id) || 'did:example:holder123';
-            const basePresentation = {
+            // Generate or get holder key pair
+            const keyPair = yield this.keyManager.generateHolderKeyPair(holder);
+            // Create the presentation
+            const presentation = yield this.createPresentationData(credentials, holder);
+            // Sign the presentation using Digital Bazaar
+            const signedPresentation = yield this.signPresentation(presentation, keyPair, challenge);
+            return signedPresentation;
+        });
+    }
+    createPresentationData(credentials, holder) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const presentationId = `presentation-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            const presentation = {
                 "@context": [
                     "https://www.w3.org/2018/credentials/v1",
                     "https://w3id.org/security/data-integrity/v2"
                 ],
                 type: ["VerifiablePresentation"],
                 verifiableCredential: credentials,
-                id: `presentation-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                id: presentationId,
                 holder: holder
             };
-            // 🔥 CALCULAR HASH DOS DADOS ANTES DE ADICIONAR A PROVA
-            const dataHash = this.calculateDataHash(basePresentation);
-            // Adicionar prova com hash dos dados
-            basePresentation.proof = {
-                type: "DataIntegrityProof",
-                cryptosuite: "ecdsa-rdfc-2019",
-                created: new Date().toISOString(),
-                verificationMethod: holder + "#key-1",
-                proofPurpose: "authentication",
-                challenge: challenge || "default-challenge",
-                dataHash: dataHash // 🔥 Hash dos dados para verificação de integridade
-            };
-            return basePresentation;
+            return presentation;
         });
     }
-    calculateDataHash(data) {
-        const normalizedData = this.normalizeObject(data);
-        const dataString = JSON.stringify(normalizedData);
-        return crypto.createHash('sha256').update(dataString, 'utf8').digest('hex');
-    }
-    normalizeObject(obj) {
-        if (obj === null || typeof obj !== 'object') {
-            return obj;
-        }
-        if (Array.isArray(obj)) {
-            return obj.map(item => this.normalizeObject(item));
-        }
-        const sortedKeys = Object.keys(obj).sort();
-        const normalizedObj = {};
-        sortedKeys.forEach(key => {
-            normalizedObj[key] = this.normalizeObject(obj[key]);
+    signPresentation(presentation, keyPair, challenge) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // Create the suite for signing
+                const suite = new data_integrity_1.DataIntegrityProof({
+                    signer: keyPair.signer(),
+                    cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
+                });
+                // Sign the presentation
+                const signedPresentation = yield (0, vc_1.signPresentation)({
+                    presentation,
+                    suite,
+                    challenge: challenge || "default-challenge",
+                    documentLoader: (0, security_document_loader_1.securityLoader)().build()
+                });
+                return signedPresentation;
+            }
+            catch (error) {
+                console.error('Error signing presentation:', error);
+                throw new Error(`Failed to sign presentation: ${error instanceof Error ? error.message : String(error)}`);
+            }
         });
-        return normalizedObj;
+    }
+    // Method for selective disclosure (future enhancement)
+    createSelectivePresentation(credentials, selectedAttributes, challenge, holderDid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // This would implement selective disclosure logic
+            // For now, just create a normal presentation
+            return this.createPresentation(credentials, challenge, holderDid);
+        });
     }
 }
 exports.Presentation = Presentation;

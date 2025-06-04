@@ -6,7 +6,9 @@
   "scripts": {
     "start": "ts-node src/app.ts",
     "build": "tsc",
-    "test": "jest"
+    "dev": "ts-node --watch src/app.ts",
+    "test": "jest",
+    "test:integration": "jest --testPathPattern=integration"
   },
   "dependencies": {
     "@digitalbazaar/data-integrity": "^2.5.0",
@@ -16,8 +18,11 @@
     "@digitalbazaar/did-method-web": "^1.0.1",
     "@digitalbazaar/ecdsa-multikey": "^1.8.0",
     "@digitalbazaar/ecdsa-rdfc-2019-cryptosuite": "^1.2.0",
+    "@digitalbazaar/ed25519-signature-2020": "^5.4.0",
+    "@digitalbazaar/ed25519-verification-key-2020": "^4.2.0",
     "@digitalbazaar/security-document-loader": "^3.0.1",
     "@digitalbazaar/vc": "^7.2.0",
+    "@digitalbazaar/x25519-key-agreement-key-2019": "^6.0.0",
     "express": "^4.17.1",
     "jest": "^27.0.6",
     "ts-node": "^10.4.0",

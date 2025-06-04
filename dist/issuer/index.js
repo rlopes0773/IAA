@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -31,79 +8,70 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Issuer = void 0;
-const credentials_1 = __importDefault(require("./credentials"));
-const crypto = __importStar(require("crypto"));
+const vc_1 = require("@digitalbazaar/vc");
+const data_integrity_1 = require("@digitalbazaar/data-integrity");
+const ecdsa_rdfc_2019_cryptosuite_1 = require("@digitalbazaar/ecdsa-rdfc-2019-cryptosuite");
+const security_document_loader_1 = require("@digitalbazaar/security-document-loader");
+const keyManager_1 = require("../utils/keyManager");
 class Issuer {
     constructor() {
-        // Se o construtor original precisar de 4 argumentos, passe valores padrão
-        this.credentials = new credentials_1.default("did:example:issuer123", // issuer DID
-        ["issuer-key-1"], // signing key (array)
-        "2025-12-31T23:59:59Z", // expiration date
-        {} // additional options
-        );
+        this.keyManager = new keyManager_1.KeyManager();
+        this.issuerDid = 'did:example:issuer123';
     }
     issueCredential(subject, type, additionalData = {}) {
         return __awaiter(this, void 0, void 0, function* () {
             console.log(`Issuing credential for ${subject} of type ${type}`);
-            // Use o método correto da classe original ou implemente createCredential
+            // Generate or get issuer key pair
+            const keyPair = yield this.keyManager.generateIssuerKeyPair();
+            // Create the credential
             const credential = yield this.createCredentialData(Object.assign({ subject,
                 type }, additionalData));
-            return credential;
+            // Sign the credential using Digital Bazaar
+            const signedCredential = yield this.signCredential(credential, keyPair);
+            return signedCredential;
         });
     }
     createCredentialData(data) {
         return __awaiter(this, void 0, void 0, function* () {
             const credentialId = `credential-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-            const baseCredential = {
+            const credential = {
                 "@context": [
                     "https://www.w3.org/2018/credentials/v1",
                     "https://w3id.org/security/data-integrity/v2"
                 ],
                 id: credentialId,
                 type: ["VerifiableCredential", data.type || "CustomCredential"],
-                issuer: "did:example:issuer123",
+                issuer: this.issuerDid,
                 issuanceDate: new Date().toISOString(),
                 expirationDate: this.calculateExpirationDate(data.type),
                 credentialSubject: this.buildCredentialSubject(data)
             };
-            // 🔥 CALCULAR HASH DOS DADOS ANTES DE ADICIONAR A PROVA
-            const dataHash = this.calculateDataHash(baseCredential);
-            // Adicionar prova com hash dos dados
-            baseCredential.proof = {
-                type: "DataIntegrityProof",
-                cryptosuite: "ecdsa-rdfc-2019",
-                created: new Date().toISOString(),
-                verificationMethod: "did:example:issuer123#key-1",
-                proofPurpose: "assertionMethod",
-                dataHash: dataHash // 🔥 Hash dos dados para verificação de integridade
-            };
-            return baseCredential;
+            return credential;
         });
     }
-    calculateDataHash(data) {
-        // Normalizar dados (ordenar chaves) para hash consistente
-        const normalizedData = this.normalizeObject(data);
-        const dataString = JSON.stringify(normalizedData);
-        return crypto.createHash('sha256').update(dataString, 'utf8').digest('hex');
-    }
-    normalizeObject(obj) {
-        if (obj === null || typeof obj !== 'object') {
-            return obj;
-        }
-        if (Array.isArray(obj)) {
-            return obj.map(item => this.normalizeObject(item));
-        }
-        const sortedKeys = Object.keys(obj).sort();
-        const normalizedObj = {};
-        sortedKeys.forEach(key => {
-            normalizedObj[key] = this.normalizeObject(obj[key]);
+    signCredential(credential, keyPair) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // Create the suite for signing
+                const suite = new data_integrity_1.DataIntegrityProof({
+                    signer: keyPair.signer(),
+                    cryptosuite: ecdsa_rdfc_2019_cryptosuite_1.cryptosuite
+                });
+                // Sign the credential
+                const signedCredential = yield (0, vc_1.issue)({
+                    credential,
+                    suite,
+                    documentLoader: (0, security_document_loader_1.securityLoader)().build()
+                });
+                return signedCredential;
+            }
+            catch (error) {
+                console.error('Error signing credential:', error);
+                throw new Error(`Failed to sign credential: ${error instanceof Error ? error.message : String(error)}`);
+            }
         });
-        return normalizedObj;
     }
     buildCredentialSubject(data) {
         const baseSubject = {
@@ -148,5 +116,4 @@ class Issuer {
     }
 }
 exports.Issuer = Issuer;
-// Export default também para compatibilidade
 exports.default = Issuer;

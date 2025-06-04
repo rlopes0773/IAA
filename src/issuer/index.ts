@@ -1,99 +1,77 @@
-import Credentials from './credentials';
-import * as crypto from 'crypto';
+import { issue } from '@digitalbazaar/vc';
+import { Ed25519VerificationKey2020 } from '@digitalbazaar/ed25519-verification-key-2020';
+import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
+import { cryptosuite as ecdsaRdfc2019Cryptosuite } from '@digitalbazaar/ecdsa-rdfc-2019-cryptosuite';
+import { securityLoader } from '@digitalbazaar/security-document-loader';
+import { KeyManager } from '../utils/keyManager';
 
 export class Issuer {
-    private credentials: Credentials;
+    private keyManager: KeyManager;
+    private issuerDid: string;
 
     constructor() {
-        // Se o construtor original precisar de 4 argumentos, passe valores padrão
-        this.credentials = new Credentials(
-            "did:example:issuer123",    // issuer DID
-            ["issuer-key-1"],           // signing key (array)
-            "2025-12-31T23:59:59Z",     // expiration date
-            {}                          // additional options
-        );
+        this.keyManager = new KeyManager();
+        this.issuerDid = 'did:example:issuer123';
     }
 
     async issueCredential(subject: string, type: string, additionalData: any = {}) {
         console.log(`Issuing credential for ${subject} of type ${type}`);
         
-        // Use o método correto da classe original ou implemente createCredential
+        // Generate or get issuer key pair
+        const keyPair = await this.keyManager.generateIssuerKeyPair();
+        
+        // Create the credential
         const credential = await this.createCredentialData({
             subject,
             type,
             ...additionalData
         });
 
-        return credential;
+        // Sign the credential using Digital Bazaar
+        const signedCredential = await this.signCredential(credential, keyPair);
+        
+        return signedCredential;
     }
 
     private async createCredentialData(data: any) {
         const credentialId = `credential-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         
-        interface VerifiableCredential {
-            "@context": string[];
-            id: string;
-            type: string[];
-            issuer: string;
-            issuanceDate: string;
-            expirationDate: string;
-            credentialSubject: any;
-            proof?: any;
-        }
-        
-        const baseCredential: VerifiableCredential = {
+        const credential = {
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://w3id.org/security/data-integrity/v2"
             ],
             id: credentialId,
             type: ["VerifiableCredential", data.type || "CustomCredential"],
-            issuer: "did:example:issuer123",
+            issuer: this.issuerDid,
             issuanceDate: new Date().toISOString(),
             expirationDate: this.calculateExpirationDate(data.type),
             credentialSubject: this.buildCredentialSubject(data)
         };
 
-        // 🔥 CALCULAR HASH DOS DADOS ANTES DE ADICIONAR A PROVA
-        const dataHash = this.calculateDataHash(baseCredential);
-
-        // Adicionar prova com hash dos dados
-        baseCredential.proof = {
-            type: "DataIntegrityProof",
-            cryptosuite: "ecdsa-rdfc-2019",
-            created: new Date().toISOString(),
-            verificationMethod: "did:example:issuer123#key-1",
-            proofPurpose: "assertionMethod",
-            dataHash: dataHash  // 🔥 Hash dos dados para verificação de integridade
-        };
-
-        return baseCredential;
+        return credential;
     }
 
-    private calculateDataHash(data: any): string {
-        // Normalizar dados (ordenar chaves) para hash consistente
-        const normalizedData = this.normalizeObject(data);
-        const dataString = JSON.stringify(normalizedData);
-        return crypto.createHash('sha256').update(dataString, 'utf8').digest('hex');
-    }
+    private async signCredential(credential: any, keyPair: any) {
+        try {
+            // Create the suite for signing
+            const suite = new DataIntegrityProof({
+                signer: keyPair.signer(),
+                cryptosuite: ecdsaRdfc2019Cryptosuite
+            });
 
-    private normalizeObject(obj: any): any {
-        if (obj === null || typeof obj !== 'object') {
-            return obj;
+            // Sign the credential
+            const signedCredential = await issue({
+                credential,
+                suite,
+                documentLoader: securityLoader().build()
+            });
+
+            return signedCredential;
+        } catch (error) {
+            console.error('Error signing credential:', error);
+            throw new Error(`Failed to sign credential: ${error instanceof Error ? error.message : String(error)}`);
         }
-
-        if (Array.isArray(obj)) {
-            return obj.map(item => this.normalizeObject(item));
-        }
-
-        const sortedKeys = Object.keys(obj).sort();
-        const normalizedObj: any = {};
-        
-        sortedKeys.forEach(key => {
-            normalizedObj[key] = this.normalizeObject(obj[key]);
-        });
-
-        return normalizedObj;
     }
 
     private buildCredentialSubject(data: any) {
@@ -169,5 +147,4 @@ export class Issuer {
     }
 }
 
-// Export default também para compatibilidade
 export default Issuer;
