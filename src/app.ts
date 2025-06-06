@@ -10,86 +10,71 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize components
+// Instanciar file storage
 const fileStorage = new FileStorage();
 const revocationRegistry = new RevocationRegistry();
 const issuer = new Issuer();
 const holder = new Holder();
 const verifier = new Verifier(revocationRegistry);
 
-// Middleware for error handling
-const asyncHandler = (fn: Function) => (req: any, res: any, next: any) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-};
-
-// Serve main page
+// Servir a página principal
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Issue credential with Digital Bazaar
-app.post('/issue', asyncHandler(async (req: any, res: any) => {
+// Issue credential
+app.post('/issue', async (req, res) => {
     try {
-        console.log('Issuing credential with Digital Bazaar...');
-        
-        const credential = await issuer.issueCredential(
-            req.body.subject, 
-            req.body.type, 
-            req.body
-        );
-        
+        const credential = await issuer.issueCredential(req.body.subject, req.body.type, req.body);
         const credentialId = credential.id || `credential-${Date.now()}`;
+        
+        // Adicionar ID se não existir
         credential.id = credentialId;
         
-        // Save to file
+        // Salvar em ficheiro
         await fileStorage.saveCredential(credentialId, credential);
         
-        res.json({ 
-            ...credential, 
-            storedId: credentialId, 
-            storage: 'file',
-            cryptographicallySigned: true,
-            signatureMethod: 'Digital Bazaar Data Integrity'
-        });
-        
+        res.json({ ...credential, storedId: credentialId, storage: 'file' });
     } catch (error) {
-        console.error('Error issuing credential:', error);
-        res.status(500).json({ 
-            error: error instanceof Error ? error.message : 'Unknown error occurred',
-            details: 'Failed to issue credential with Digital Bazaar signature'
-        });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-}));
+});
 
 // Get all credentials
-app.get('/credentials', asyncHandler(async (req: any, res: any) => {
-    const credentials = await fileStorage.loadAllCredentials();
-    const formattedCredentials = credentials.map(data => ({
-        id: data.id,
-        ...data.credential,
-        preview: data.preview,
-        savedAt: data.savedAt
-    }));
-    res.json(formattedCredentials);
-}));
+app.get('/credentials', async (req, res) => {
+    try {
+        const credentials = await fileStorage.loadAllCredentials();
+        const formattedCredentials = credentials.map(data => ({
+            id: data.id,
+            ...data.credential,
+            preview: data.preview,
+            savedAt: data.savedAt
+        }));
+        res.json(formattedCredentials);
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
+    }
+});
 
 // Get specific credential
-app.get('/credentials/:id', asyncHandler(async (req: any, res: any) => {
-    const data = await fileStorage.loadCredential(req.params.id);
-    if (!data) {
-        return res.status(404).json({ error: 'Credential not found' });
+app.get('/credentials/:id', async (req, res) => {
+    try {
+        const data = await fileStorage.loadCredential(req.params.id);
+        if (!data) {
+            return res.status(404).json({ error: 'Credential not found' });
+        }
+        res.json(data.credential);
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-    res.json(data.credential);
-}));
+});
 
-// Create presentation with Digital Bazaar
-app.post('/present', asyncHandler(async (req: any, res: any) => {
+// Create presentation with selected credentials
+app.post('/present', async (req, res) => {
     try {
         const { credentialIds, challenge, holderDid } = req.body;
         
-        console.log('Creating presentation with Digital Bazaar...');
-        
-        // Load selected credentials
+        // Buscar credenciais selecionadas dos ficheiros
         const selectedCredentials = [];
         for (const id of credentialIds) {
             const data = await fileStorage.loadCredential(id);
@@ -102,114 +87,108 @@ app.post('/present', asyncHandler(async (req: any, res: any) => {
             return res.status(400).json({ error: 'No valid credentials found' });
         }
         
-        const presentation = await holder.createPresentation(
-            selectedCredentials, 
-            challenge, 
-            holderDid
-        );
-        
+        const presentation = await holder.createPresentation(selectedCredentials, challenge);
         const presentationId = presentation.id || `presentation-${Date.now()}`;
+        
+        // Adicionar ID se não existir
         presentation.id = presentationId;
         
-        // Save to file
+        // Salvar em ficheiro
         await fileStorage.savePresentation(presentationId, presentation);
         
-        res.json({ 
-            ...presentation, 
-            storedId: presentationId, 
-            storage: 'file',
-            cryptographicallySigned: true,
-            signatureMethod: 'Digital Bazaar Data Integrity'
-        });
-        
+        res.json({ ...presentation, storedId: presentationId, storage: 'file' });
     } catch (error) {
-        console.error('Error creating presentation:', error);
-        res.status(500).json({ 
-            error: error instanceof Error ? error.message : 'Unknown error occurred',
-            details: 'Failed to create presentation with Digital Bazaar signature'
-        });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-}));
+});
 
 // Get all presentations
-app.get('/presentations', asyncHandler(async (req: any, res: any) => {
-    const presentations = await fileStorage.loadAllPresentations();
-    const formattedPresentations = presentations.map(data => ({
-        id: data.id,
-        ...data.presentation,
-        preview: data.preview,
-        savedAt: data.savedAt
-    }));
-    res.json(formattedPresentations);
-}));
+app.get('/presentations', async (req, res) => {
+    try {
+        const presentations = await fileStorage.loadAllPresentations();
+        const formattedPresentations = presentations.map(data => ({
+            id: data.id,
+            ...data.presentation,
+            preview: data.preview,
+            savedAt: data.savedAt
+        }));
+        res.json(formattedPresentations);
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
+    }
+});
 
 // Get specific presentation
-app.get('/presentations/:id', asyncHandler(async (req: any, res: any) => {
-    const data = await fileStorage.loadPresentation(req.params.id);
-    if (!data) {
-        return res.status(404).json({ error: 'Presentation not found' });
+app.get('/presentations/:id', async (req, res) => {
+    try {
+        const data = await fileStorage.loadPresentation(req.params.id);
+        if (!data) {
+            return res.status(404).json({ error: 'Presentation not found' });
+        }
+        res.json(data.presentation);
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-    res.json(data.presentation);
-}));
+});
 
-// Verify presentation with Digital Bazaar
-app.post('/verify/:id', asyncHandler(async (req: any, res: any) => {
+// Verify specific presentation
+app.post('/verify/:id', async (req, res) => {
     try {
         const data = await fileStorage.loadPresentation(req.params.id);
         if (!data) {
             return res.status(404).json({ error: 'Presentation not found' });
         }
         
-        console.log('Verifying presentation with Digital Bazaar...');
-        
+        // Opções de verificação do corpo da requisição
         const verificationOptions = req.body || {};
-        const result = await verifier.verify(data.presentation, verificationOptions);
         
+        const result = await verifier.verify(data.presentation, verificationOptions);
         res.json({ 
             ...result, 
             source: 'file',
-            timestamp: new Date().toISOString(),
-            verificationMethod: 'Digital Bazaar Cryptographic Verification'
+            timestamp: new Date().toISOString()
         });
-        
     } catch (error) {
-        console.error('Error verifying presentation:', error);
-        res.status(500).json({ 
-            error: error instanceof Error ? error.message : String(error),
-            details: 'Failed to verify presentation with Digital Bazaar'
-        });
+        res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
-}));
+});
 
-// Verify with context
-app.post('/verify/:id/context', asyncHandler(async (req: any, res: any) => {
-    const data = await fileStorage.loadPresentation(req.params.id);
-    if (!data) {
-        return res.status(404).json({ error: 'Presentation not found' });
+// Novo endpoint para verificação com contexto específico
+app.post('/verify/:id/context', async (req, res) => {
+    try {
+        const data = await fileStorage.loadPresentation(req.params.id);
+        if (!data) {
+            return res.status(404).json({ error: 'Presentation not found' });
+        }
+        
+        const context = req.body;
+        // Use the verify method with context as part of the options
+        const result = await verifier.verify(data.presentation, { context });
+        res.json({ 
+            ...result, 
+            source: 'file',
+            context: context,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
-    
-    const context = req.body;
-    const result = await verifier.verify(data.presentation, { context });
-    
-    res.json({ 
-        ...result, 
-        source: 'file',
-        context: context,
-        timestamp: new Date().toISOString(),
-        verificationMethod: 'Digital Bazaar Cryptographic Verification with Context'
-    });
-}));
+});
 
 // Revoke presentation
-app.post('/revoke/:id', asyncHandler(async (req: any, res: any) => {
-    const data = await fileStorage.loadPresentation(req.params.id);
-    if (!data) {
-        return res.status(404).json({ error: 'Presentation not found' });
+app.post('/revoke/:id', async (req, res) => {
+    try {
+        const data = await fileStorage.loadPresentation(req.params.id);
+        if (!data) {
+            return res.status(404).json({ error: 'Presentation not found' });
+        }
+        
+        const result = revocationRegistry.revokePresentation({ presentationId: req.params.id });
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-    
-    const result = revocationRegistry.revokePresentation({ presentationId: req.params.id });
-    res.json(result);
-}));
+});
 
 // Check revocation status
 app.get('/check-revocation/:id', (req, res) => {
@@ -222,26 +201,34 @@ app.get('/check-revocation/:id', (req, res) => {
 });
 
 // Delete credential
-app.delete('/credentials/:id', asyncHandler(async (req: any, res: any) => {
-    const deleted = await fileStorage.deleteCredential(req.params.id);
-    if (deleted) {
-        res.json({ success: true, message: 'Credential deleted from file system' });
-    } else {
-        res.status(404).json({ error: 'Credential not found' });
+app.delete('/credentials/:id', async (req, res) => {
+    try {
+        const deleted = await fileStorage.deleteCredential(req.params.id);
+        if (deleted) {
+            res.json({ success: true, message: 'Credential deleted from file system' });
+        } else {
+            res.status(404).json({ error: 'Credential not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-}));
+});
 
 // Delete presentation
-app.delete('/presentations/:id', asyncHandler(async (req: any, res: any) => {
-    const deleted = await fileStorage.deletePresentation(req.params.id);
-    if (deleted) {
-        res.json({ success: true, message: 'Presentation deleted from file system' });
-    } else {
-        res.status(404).json({ error: 'Presentation not found' });
+app.delete('/presentations/:id', async (req, res) => {
+    try {
+        const deleted = await fileStorage.deletePresentation(req.params.id);
+        if (deleted) {
+            res.json({ success: true, message: 'Presentation deleted from file system' });
+        } else {
+            res.status(404).json({ error: 'Presentation not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
-}));
+});
 
-// Storage management endpoints
+// Storage statistics
 app.get('/storage/stats', (req, res) => {
     try {
         const stats = fileStorage.getStorageStats();
@@ -251,29 +238,23 @@ app.get('/storage/stats', (req, res) => {
     }
 });
 
-app.post('/storage/backup', asyncHandler(async (req: any, res: any) => {
-    const backupPath = await fileStorage.createBackup();
-    res.json({ 
-        success: true, 
-        message: 'Backup created successfully',
-        backupPath: backupPath
-    });
-}));
-
-// Global error handler
-app.use((error: any, req: any, res: any, next: any) => {
-    console.error('Global error handler:', error);
-    res.status(500).json({
-        error: 'Internal server error',
-        message: error.message,
-        timestamp: new Date().toISOString()
-    });
+// Create backup
+app.post('/storage/backup', async (req, res) => {
+    try {
+        const backupPath = await fileStorage.createBackup();
+        res.json({ 
+            success: true, 
+            message: 'Backup created successfully',
+            backupPath: backupPath
+        });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 VC Demo server running on port ${PORT}`);
-    console.log(`📱 Open http://localhost:${PORT} in your browser`);
-    console.log(`💾 Files stored in: data/ directory`);
-    console.log(`🔐 Using Digital Bazaar cryptographic verification`);
+    console.log(`VC Demo server running on port ${PORT}`);
+    console.log(`Open http://localhost:${PORT} in your browser`);
+    console.log(`Files stored in: data/ directory`);
 });

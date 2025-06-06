@@ -1,31 +1,25 @@
-import express from 'express';
-import cors from 'cors';
-// Adicionar imports para selective disclosure
 import * as vc from '@digitalbazaar/vc';
-import { createSignCryptosuite } from '@digitalbazaar/ecdsa-sd-2023-cryptosuite';
+import { createSignCryptosuite, createVerifyCryptosuite } from '@digitalbazaar/ecdsa-sd-2023-cryptosuite';
 import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
 import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
 import * as didKey from '@digitalbazaar/did-method-key';
 import jsonld from 'jsonld';
 
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-app.use(cors());
-app.use(express.json());
-
-// Configurar JSON-LD
+// Configurar JSON-LD para desabilitar safe mode globalmente
 jsonld.documentLoader = jsonld.documentLoaders.node();
 
-// Document loader para suportar DIDs e contextos
-const documentLoader = async (url: string) => {
+// Document loader personalizado corrigido
+const documentLoader = async (url) => {
   console.log(`📋 Loading: ${url}`);
   
+  // Para DIDs do tipo did:key, usar o driver corretamente
   if (url.startsWith('did:key:')) {
     try {
+      // Extrair apenas o DID (sem fragment)
       const didUrl = url.split('#')[0];
       const { didDocument } = await didKey.driver().get({ did: didUrl });
       
+      // Se o URL tem um fragment, retornar a chave específica
       if (url.includes('#')) {
         const fragment = url.split('#')[1];
         const verificationMethod = didDocument.verificationMethod?.find(
@@ -47,16 +41,17 @@ const documentLoader = async (url: string) => {
         documentUrl: url
       };
     } catch (error) {
-      console.error(`❌ Erro ao resolver DID: ${url}`, error instanceof Error ? error.message : String(error));
+      console.error(`❌ Erro ao resolver DID: ${url}`, error.message);
       throw error;
     }
   }
   
+  // Usar o document loader padrão para contextos remotos
   try {
     const result = await jsonld.documentLoaders.node()(url);
     return result;
   } catch (error) {
-    // Contextos locais como fallback
+    // Se falhar, tentar contextos locais
     const contexts = {
       'https://www.w3.org/2018/credentials/v1': {
         "@context": {
@@ -224,80 +219,158 @@ const documentLoader = async (url: string) => {
   }
 };
 
-// Rota existente de health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'Issuer service is running', timestamp: new Date().toISOString() });
-});
+// Document loader wrapper que desabilita safe mode
+const safeDocumentLoader = async (url) => {
+  const result = await documentLoader(url);
+  // Forçar safe mode = false no processo de loading
+  if (result.document && typeof result.document === 'object') {
+    result.document._safe = false;
+  }
+  return result;
+};
 
-// Nova rota para credenciais com Selective Disclosure
-app.post('/issue-sd', async (req, res) => {
+async function testSelectiveDisclosure() {
+  console.log('🚀 Testando Selective Disclosure com ECDSA-SD-2023...\n');
+
   try {
-    console.log('🚀 Issuing credential with Selective Disclosure...');
-    
-    // 1. Gerar chaves ECDSA P-256
+    // 1. Gerar chaves ECDSA P-256 com DID real
+    console.log('1. Gerando chaves ECDSA P-256...');
     const keyPair = await EcdsaMultikey.generate({
       curve: 'P-256'
     });
     
+    // Criar um DID:key real a partir da chave pública
     const did = `did:key:${keyPair.publicKeyMultibase}`;
     keyPair.id = `${did}#${keyPair.publicKeyMultibase}`;
     keyPair.controller = did;
-
-    // 2. Criar credencial com selective pointers
-    const { credentialData, selectivePointers = [] } = req.body;
     
+    console.log('✅ Chaves geradas');
+    console.log('   Key ID:', keyPair.id);
+    console.log('   Controller:', keyPair.controller);
+
+    // 2. Criar credencial mais simples, usando apenas contextos padrão
     const credential = {
-      "@context": ["https://www.w3.org/2018/credentials/v1"],
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1"
+      ],
       "id": `http://example.edu/credentials/${Date.now()}`,
       "type": ["VerifiableCredential"],
       "issuer": keyPair.controller,
       "issuanceDate": new Date().toISOString(),
-      "credentialSubject": credentialData
+      "credentialSubject": {
+        "id": "did:example:student123",
+        "http://schema.org/name": "João Silva",
+        "http://example.org/degree": {
+          "http://www.w3.org/1999/02/22-rdf-syntax-ns#type": "http://example.org/BachelorDegree",
+          "http://schema.org/name": "Bachelor of Computer Science", 
+          "http://example.org/university": "Universidade de Lisboa",
+          "http://example.org/graduationDate": "2023-06-15"
+        },
+        "http://example.org/gpa": "3.8"
+      }
     };
 
-    // 3. Criar suite com selective disclosure
+    console.log('\n2. Credencial criada (usando IRIs absolutos):');
+    console.log(JSON.stringify(credential, null, 2));
+
+    // 3. Criar cryptosuite para assinatura com selective disclosure
     const signSuite = new DataIntegrityProof({
       signer: keyPair.signer(),
       cryptosuite: createSignCryptosuite({
-        selectivePointers
+        // Definir quais campos podem ser seletivamente divulgados
+        selectivePointers: [
+          '/credentialSubject/http://schema.org/name',
+          '/credentialSubject/http://example.org/gpa',
+          '/credentialSubject/http://example.org/degree/http://example.org/university',
+          '/credentialSubject/http://example.org/degree/http://example.org/graduationDate'
+        ]
       })
     });
 
-    // 4. Assinar credencial
+    // 4. Assinar a credencial com selective disclosure
+    console.log('\n3. Assinando credencial com SD...');
+    
     const signedCredential = await vc.issue({
       credential,
       suite: signSuite,
-      documentLoader
+      documentLoader: safeDocumentLoader
     });
 
-    console.log('✅ Credential with SD issued successfully');
-    console.log('   Cryptosuite:', signedCredential.proof.cryptosuite);
-    console.log('   Selective Pointers:', selectivePointers);
-    
-    res.json({
-      success: true,
-      credential: signedCredential,
-      issuerDid: keyPair.controller,
-      selectivePointers,
-      metadata: {
-        cryptosuite: signedCredential.proof.cryptosuite,
-        created: signedCredential.proof.created,
-        verificationMethod: signedCredential.proof.verificationMethod
-      }
+    console.log('✅ Credencial assinada com selective disclosure!');
+    console.log('\n   Proof criado:');
+    console.log('   Type:', signedCredential.proof.type);
+    console.log('   Created:', signedCredential.proof.created);
+    console.log('   Verification Method:', signedCredential.proof.verificationMethod);
+
+    // 5. Criar suite para verificação
+    const verifySuite = new DataIntegrityProof({
+      cryptosuite: createVerifyCryptosuite()
     });
+
+    // 6. Verificar a credencial completa
+    console.log('\n4. Verificando credencial completa...');
+    const fullResult = await vc.verifyCredential({
+      credential: signedCredential,
+      suite: verifySuite,
+      documentLoader: safeDocumentLoader
+    });
+
+    console.log('✅ Resultado da verificação completa:');
+    console.log('   Verified:', fullResult.verified);
+    if (fullResult.error) {
+      console.log('   Errors:', fullResult.error);
+    }
+
+    // 7. Mostrar a credencial completa assinada
+    console.log('\n📄 Credencial Completa Assinada:');
+    console.log(JSON.stringify(signedCredential, null, 2));
+
+    // 8. Demonstrar selective disclosure
+    console.log('\n5. Demonstrando Selective Disclosure...');
+    console.log('   📋 Campos configurados para selective disclosure:');
+    console.log('   - /credentialSubject/http://schema.org/name (pode ser ocultado)');
+    console.log('   - /credentialSubject/http://example.org/gpa (pode ser ocultado)'); 
+    console.log('   - /credentialSubject/http://example.org/degree/http://example.org/university (pode ser ocultado)');
+    console.log('   - /credentialSubject/http://example.org/degree/http://example.org/graduationDate (pode ser ocultado)');
+    
+    console.log('\n   ✅ A credencial está preparada para selective disclosure!');
+
+    return {
+      keyPair,
+      credential: signedCredential,
+      verified: fullResult.verified
+    };
 
   } catch (error) {
-    console.error('❌ Error issuing SD credential:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      stack: error.stack
-    });
+    console.error('❌ Erro:', error.message);
+    console.error('Stack:', error.stack);
+    throw error;
   }
-});
+}
 
-app.listen(PORT, () => {
-  console.log(`🚀 Issuer service running on port ${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔒 SD Issuer: http://localhost:${PORT}/issue-sd`);
-});
+// Executar o teste
+testSelectiveDisclosure()
+  .then(result => {
+    console.log('\n🎉 Teste de Selective Disclosure concluído!');
+    console.log('   Credencial verificada:', result.verified);
+    
+    if (result.verified) {
+      console.log('\n✅ SUCESSO! A implementação está funcionando:');
+      console.log('   - Credencial assinada com ECDSA-SD-2023 ✅');
+      console.log('   - Selective pointers configurados ✅');  
+      console.log('   - Verificação da assinatura ✅');
+    } else {
+      console.log('\n⚠️  Verification falhou, mas a assinatura foi criada');
+    }
+    
+    console.log('\n📋 Próximos passos:');
+    console.log('   - Implementar função de derivação para ocultar campos');
+    console.log('   - Criar apresentações com selective disclosure');
+    console.log('   - Integrar com interface web');
+  })
+  .catch(error => {
+    console.error('\n💥 Falha no teste:', error);
+    process.exit(1);
+  });
+
+export { testSelectiveDisclosure };

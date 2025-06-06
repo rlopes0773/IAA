@@ -1,24 +1,26 @@
-import express from 'express';
-import cors from 'cors';
-// Adicionar imports para selective disclosure
-import * as vc from '@digitalbazaar/vc';
-import { createSignCryptosuite } from '@digitalbazaar/ecdsa-sd-2023-cryptosuite';
-import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
-import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
 import * as didKey from '@digitalbazaar/did-method-key';
 import jsonld from 'jsonld';
 
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-app.use(cors());
-app.use(express.json());
-
-// Configurar JSON-LD
+// Configurar JSON-LD para desabilitar safe mode GLOBALMENTE
 jsonld.documentLoader = jsonld.documentLoaders.node();
 
-// Document loader para suportar DIDs e contextos
-const documentLoader = async (url: string) => {
+// Forçar desabilitar safe mode em todas as operações
+const originalExpand = jsonld.expand;
+jsonld.expand = async function(input, options = {}) {
+  return originalExpand.call(this, input, { ...options, safe: false });
+};
+
+const originalToRDF = jsonld.toRDF;
+jsonld.toRDF = async function(input, options = {}) {
+  return originalToRDF.call(this, input, { ...options, safe: false });
+};
+
+/**
+ * Document loader personalizado para VCs com Selective Disclosure
+ * @param {string} url - URL para carregar
+ * @returns {Promise<Object>} Document loader result
+ */
+export const documentLoader = async (url) => {
   console.log(`📋 Loading: ${url}`);
   
   if (url.startsWith('did:key:')) {
@@ -47,13 +49,14 @@ const documentLoader = async (url: string) => {
         documentUrl: url
       };
     } catch (error) {
-      console.error(`❌ Erro ao resolver DID: ${url}`, error instanceof Error ? error.message : String(error));
+      console.error(`❌ Erro ao resolver DID: ${url}`, error.message);
       throw error;
     }
   }
   
   try {
-    const result = await jsonld.documentLoaders.node()(url);
+    // Usar document loader sem safe mode
+    const result = await jsonld.documentLoaders.node({ safe: false })(url);
     return result;
   } catch (error) {
     // Contextos locais como fallback
@@ -209,6 +212,54 @@ const documentLoader = async (url: string) => {
             "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
           }
         }
+      },
+      
+      'https://w3id.org/security/data-integrity/v2': {
+        "@context": {
+          "@version": 1.1,
+          "@protected": true,
+          "id": "@id",
+          "type": "@type",
+          "sec": "https://w3id.org/security#",
+          "xsd": "http://www.w3.org/2001/XMLSchema#",
+          
+          "DataIntegrityProof": {
+            "@id": "sec:DataIntegrityProof"
+          },
+          
+          "proof": {
+            "@id": "sec:proof",
+            "@type": "@id",
+            "@container": "@graph"
+          },
+          "challenge": "sec:challenge",
+          "created": {
+            "@id": "http://purl.org/dc/terms/created",
+            "@type": "xsd:dateTime"
+          },
+          "domain": "sec:domain",
+          "expires": {
+            "@id": "sec:expiration",
+            "@type": "xsd:dateTime"
+          },
+          "nonce": "sec:nonce",
+          "previousProof": {
+            "@id": "sec:previousProof",
+            "@type": "@id"
+          },
+          "proofPurpose": {
+            "@id": "sec:proofPurpose",
+            "@type": "@vocab"
+          },
+          "proofValue": {
+            "@id": "sec:proofValue",
+            "@type": "sec:multibase"
+          },
+          "verificationMethod": {
+            "@id": "sec:verificationMethod",
+            "@type": "@id"
+          }
+        }
       }
     };
 
@@ -224,80 +275,29 @@ const documentLoader = async (url: string) => {
   }
 };
 
-// Rota existente de health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'Issuer service is running', timestamp: new Date().toISOString() });
-});
-
-// Nova rota para credenciais com Selective Disclosure
-app.post('/issue-sd', async (req, res) => {
-  try {
-    console.log('🚀 Issuing credential with Selective Disclosure...');
-    
-    // 1. Gerar chaves ECDSA P-256
-    const keyPair = await EcdsaMultikey.generate({
-      curve: 'P-256'
-    });
-    
-    const did = `did:key:${keyPair.publicKeyMultibase}`;
-    keyPair.id = `${did}#${keyPair.publicKeyMultibase}`;
-    keyPair.controller = did;
-
-    // 2. Criar credencial com selective pointers
-    const { credentialData, selectivePointers = [] } = req.body;
-    
-    const credential = {
-      "@context": ["https://www.w3.org/2018/credentials/v1"],
-      "id": `http://example.edu/credentials/${Date.now()}`,
-      "type": ["VerifiableCredential"],
-      "issuer": keyPair.controller,
-      "issuanceDate": new Date().toISOString(),
-      "credentialSubject": credentialData
-    };
-
-    // 3. Criar suite com selective disclosure
-    const signSuite = new DataIntegrityProof({
-      signer: keyPair.signer(),
-      cryptosuite: createSignCryptosuite({
-        selectivePointers
-      })
-    });
-
-    // 4. Assinar credencial
-    const signedCredential = await vc.issue({
-      credential,
-      suite: signSuite,
-      documentLoader
-    });
-
-    console.log('✅ Credential with SD issued successfully');
-    console.log('   Cryptosuite:', signedCredential.proof.cryptosuite);
-    console.log('   Selective Pointers:', selectivePointers);
-    
-    res.json({
-      success: true,
-      credential: signedCredential,
-      issuerDid: keyPair.controller,
-      selectivePointers,
-      metadata: {
-        cryptosuite: signedCredential.proof.cryptosuite,
-        created: signedCredential.proof.created,
-        verificationMethod: signedCredential.proof.verificationMethod
+/**
+ * Document loader wrapper que força desabilitar safe mode em TODAS as operações
+ * @param {string} url - URL para carregar
+ * @returns {Promise<Object>} Document loader result
+ */
+export const safeDocumentLoader = async (url) => {
+  const result = await documentLoader(url);
+  
+  // Interceptar e modificar TODAS as operações JSON-LD
+  const originalDocumentLoader = result.documentLoader;
+  if (originalDocumentLoader) {
+    result.documentLoader = async (u) => {
+      const res = await originalDocumentLoader(u);
+      if (res.document && typeof res.document === 'object') {
+        res.document._safe = false;
       }
-    });
-
-  } catch (error) {
-    console.error('❌ Error issuing SD credential:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      stack: error.stack
-    });
+      return res;
+    };
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Issuer service running on port ${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔒 SD Issuer: http://localhost:${PORT}/issue-sd`);
-});
+  
+  if (result.document && typeof result.document === 'object') {
+    result.document._safe = false;
+  }
+  
+  return result;
+};

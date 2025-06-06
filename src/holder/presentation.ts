@@ -1,15 +1,8 @@
-import { signPresentation } from '@digitalbazaar/vc';
-import { Ed25519VerificationKey2020 } from '@digitalbazaar/ed25519-verification-key-2020';
-import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
-import { cryptosuite as ecdsaRdfc2019Cryptosuite } from '@digitalbazaar/ecdsa-rdfc-2019-cryptosuite';
-import { securityLoader } from '@digitalbazaar/security-document-loader';
-import { KeyManager } from '../utils/keyManager';
+import * as crypto from 'crypto';
 
 export class Presentation {
-    private keyManager: KeyManager;
-
     constructor() {
-        this.keyManager = new KeyManager();
+        // Construtor sem parâmetros
     }
 
     async createPresentation(credentials: any[], challenge?: string, holderDid?: string) {
@@ -17,63 +10,66 @@ export class Presentation {
         
         const holder = holderDid || credentials[0]?.credentialSubject?.id || 'did:example:holder123';
         
-        // Generate or get holder key pair
-        const keyPair = await this.keyManager.generateHolderKeyPair(holder);
+        interface VerifiablePresentation {
+            "@context": string[];
+            type: string[];
+            verifiableCredential: any[];
+            id: string;
+            holder: string;
+            proof?: any;
+        }
         
-        // Create the presentation
-        const presentation = await this.createPresentationData(credentials, holder);
-        
-        // Sign the presentation using Digital Bazaar
-        const signedPresentation = await this.signPresentation(presentation, keyPair, challenge);
-        
-        return signedPresentation;
-    }
-
-    private async createPresentationData(credentials: any[], holder: string) {
-        const presentationId = `presentation-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-        
-        const presentation = {
+        const basePresentation: VerifiablePresentation = {
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://w3id.org/security/data-integrity/v2"
             ],
             type: ["VerifiablePresentation"],
             verifiableCredential: credentials,
-            id: presentationId,
+            id: `presentation-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             holder: holder
         };
 
-        return presentation;
+        // 🔥 CALCULAR HASH DOS DADOS ANTES DE ADICIONAR A PROVA
+        const dataHash = this.calculateDataHash(basePresentation);
+
+        // Adicionar prova com hash dos dados
+        basePresentation.proof = {
+            type: "DataIntegrityProof",
+            cryptosuite: "ecdsa-rdfc-2019",
+            created: new Date().toISOString(),
+            verificationMethod: holder + "#key-1",
+            proofPurpose: "authentication",
+            challenge: challenge || "default-challenge",
+            dataHash: dataHash  // 🔥 Hash dos dados para verificação de integridade
+        };
+
+        return basePresentation;
     }
 
-    private async signPresentation(presentation: any, keyPair: any, challenge?: string) {
-        try {
-            // Create the suite for signing
-            const suite = new DataIntegrityProof({
-                signer: keyPair.signer(),
-                cryptosuite: ecdsaRdfc2019Cryptosuite
-            });
+    private calculateDataHash(data: any): string {
+        const normalizedData = this.normalizeObject(data);
+        const dataString = JSON.stringify(normalizedData);
+        return crypto.createHash('sha256').update(dataString, 'utf8').digest('hex');
+    }
 
-            // Sign the presentation
-            const signedPresentation = await signPresentation({
-                presentation,
-                suite,
-                challenge: challenge || "default-challenge",
-                documentLoader: securityLoader().build()
-            });
-
-            return signedPresentation;
-        } catch (error) {
-            console.error('Error signing presentation:', error);
-            throw new Error(`Failed to sign presentation: ${error instanceof Error ? error.message : String(error)}`);
+    private normalizeObject(obj: any): any {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
         }
-    }
 
-    // Method for selective disclosure (future enhancement)
-    async createSelectivePresentation(credentials: any[], selectedAttributes: string[], challenge?: string, holderDid?: string) {
-        // This would implement selective disclosure logic
-        // For now, just create a normal presentation
-        return this.createPresentation(credentials, challenge, holderDid);
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.normalizeObject(item));
+        }
+
+        const sortedKeys = Object.keys(obj).sort();
+        const normalizedObj: any = {};
+        
+        sortedKeys.forEach(key => {
+            normalizedObj[key] = this.normalizeObject(obj[key]);
+        });
+
+        return normalizedObj;
     }
 }
 

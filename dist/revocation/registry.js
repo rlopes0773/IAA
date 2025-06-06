@@ -12,4 +12,3 @@ class RevocationRegistry {
     }
 }
 exports.default = RevocationRegistry;
-//# sourceMappingURL=registry.js.map

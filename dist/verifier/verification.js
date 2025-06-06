@@ -22,6 +22,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Verification = void 0;
 const crypto = __importStar(require("crypto"));
@@ -29,72 +38,74 @@ class Verification {
     constructor(revocationRegistry) {
         this.revocationRegistry = revocationRegistry;
     }
-    async verifyPresentation(presentation, options = {}) {
-        console.log('Starting comprehensive presentation verification...');
-        const verificationResult = {
-            verified: false,
-            presentationId: presentation.id,
-            revoked: false,
-            checks: {
-                structure: false,
-                signature: false,
-                challenge: false,
-                credentials: false,
-                expiration: false,
-                revocation: false
-            },
-            errors: [],
-            warnings: []
-        };
-        try {
-            // 1. VERIFICAÇÃO ESTRUTURAL
-            const structureCheck = this.validateStructure(presentation);
-            verificationResult.checks.structure = structureCheck.valid;
-            if (!structureCheck.valid) {
-                verificationResult.errors.push(...structureCheck.errors);
+    verifyPresentation(presentation, options = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('Starting comprehensive presentation verification...');
+            const verificationResult = {
+                verified: false,
+                presentationId: presentation.id,
+                revoked: false,
+                checks: {
+                    structure: false,
+                    signature: false,
+                    challenge: false,
+                    credentials: false,
+                    expiration: false,
+                    revocation: false
+                },
+                errors: [],
+                warnings: []
+            };
+            try {
+                // 1. VERIFICAÇÃO ESTRUTURAL
+                const structureCheck = this.validateStructure(presentation);
+                verificationResult.checks.structure = structureCheck.valid;
+                if (!structureCheck.valid) {
+                    verificationResult.errors.push(...structureCheck.errors);
+                }
+                // 2. VERIFICAÇÃO DE REVOGAÇÃO
+                const revocationCheck = this.checkRevocationStatus(presentation.id);
+                verificationResult.checks.revocation = !revocationCheck.revoked;
+                verificationResult.revoked = revocationCheck.revoked;
+                if (revocationCheck.revoked) {
+                    verificationResult.errors.push('Presentation has been revoked');
+                    return verificationResult; // Para aqui se foi revogada
+                }
+                // 3. VERIFICAÇÃO DE CHALLENGE
+                const challengeCheck = this.validateChallenge(presentation, options.expectedChallenge);
+                verificationResult.checks.challenge = challengeCheck.valid;
+                if (!challengeCheck.valid) {
+                    verificationResult.errors.push(...challengeCheck.errors);
+                }
+                // 4. VERIFICAÇÃO DE ASSINATURA
+                const signatureCheck = yield this.validateSignature(presentation);
+                verificationResult.checks.signature = signatureCheck.valid;
+                if (!signatureCheck.valid) {
+                    verificationResult.errors.push(...signatureCheck.errors);
+                }
+                // 5. VERIFICAÇÃO DAS CREDENCIAIS
+                const credentialsCheck = yield this.validateCredentials(presentation.verifiableCredential);
+                verificationResult.checks.credentials = credentialsCheck.valid;
+                if (!credentialsCheck.valid) {
+                    verificationResult.errors.push(...credentialsCheck.errors);
+                }
+                verificationResult.warnings.push(...credentialsCheck.warnings);
+                // 6. VERIFICAÇÃO DE EXPIRAÇÃO
+                const expirationCheck = this.validateExpiration(presentation);
+                verificationResult.checks.expiration = expirationCheck.valid;
+                if (!expirationCheck.valid) {
+                    verificationResult.errors.push(...expirationCheck.errors);
+                }
+                // RESULTADO FINAL
+                verificationResult.verified = Object.values(verificationResult.checks).every(check => check === true);
+                console.log('Verification completed:', verificationResult);
+                return verificationResult;
             }
-            // 2. VERIFICAÇÃO DE REVOGAÇÃO
-            const revocationCheck = this.checkRevocationStatus(presentation.id);
-            verificationResult.checks.revocation = !revocationCheck.revoked;
-            verificationResult.revoked = revocationCheck.revoked;
-            if (revocationCheck.revoked) {
-                verificationResult.errors.push('Presentation has been revoked');
-                return verificationResult; // Para aqui se foi revogada
+            catch (error) {
+                verificationResult.errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
+                return verificationResult;
             }
-            // 3. VERIFICAÇÃO DE CHALLENGE
-            const challengeCheck = this.validateChallenge(presentation, options.expectedChallenge);
-            verificationResult.checks.challenge = challengeCheck.valid;
-            if (!challengeCheck.valid) {
-                verificationResult.errors.push(...challengeCheck.errors);
-            }
-            // 4. VERIFICAÇÃO DE ASSINATURA
-            const signatureCheck = await this.validateSignature(presentation);
-            verificationResult.checks.signature = signatureCheck.valid;
-            if (!signatureCheck.valid) {
-                verificationResult.errors.push(...signatureCheck.errors);
-            }
-            // 5. VERIFICAÇÃO DAS CREDENCIAIS
-            const credentialsCheck = await this.validateCredentials(presentation.verifiableCredential);
-            verificationResult.checks.credentials = credentialsCheck.valid;
-            if (!credentialsCheck.valid) {
-                verificationResult.errors.push(...credentialsCheck.errors);
-            }
-            verificationResult.warnings.push(...credentialsCheck.warnings);
-            // 6. VERIFICAÇÃO DE EXPIRAÇÃO
-            const expirationCheck = this.validateExpiration(presentation);
-            verificationResult.checks.expiration = expirationCheck.valid;
-            if (!expirationCheck.valid) {
-                verificationResult.errors.push(...expirationCheck.errors);
-            }
-            // RESULTADO FINAL
-            verificationResult.verified = Object.values(verificationResult.checks).every(check => check === true);
-            console.log('Verification completed:', verificationResult);
-            return verificationResult;
-        }
-        catch (error) {
-            verificationResult.errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
-            return verificationResult;
-        }
+        });
     }
     validateStructure(presentation) {
         const errors = [];
@@ -144,8 +155,9 @@ class Verification {
         };
     }
     validateChallenge(presentation, expectedChallenge) {
+        var _a;
         const errors = [];
-        if (!presentation.proof?.challenge) {
+        if (!((_a = presentation.proof) === null || _a === void 0 ? void 0 : _a.challenge)) {
             errors.push('Missing challenge in proof');
             return { valid: false, errors };
         }
@@ -154,52 +166,54 @@ class Verification {
         }
         return { valid: errors.length === 0, errors };
     }
-    async validateSignature(presentation) {
-        const errors = [];
-        if (!presentation.proof) {
-            errors.push('Missing proof object');
-            return { valid: false, errors };
-        }
-        const proof = presentation.proof;
-        // Verificar campos obrigatórios da prova
-        if (!proof.type) {
-            errors.push('Missing proof type');
-        }
-        if (!proof.verificationMethod) {
-            errors.push('Missing verification method');
-        }
-        if (!proof.created) {
-            errors.push('Missing proof creation date');
-        }
-        if (!proof.proofPurpose) {
-            errors.push('Missing proof purpose');
-        }
-        else if (proof.proofPurpose !== 'authentication') {
-            errors.push(`Invalid proof purpose. Expected: authentication, Got: ${proof.proofPurpose}`);
-        }
-        // Verificar se a data de criação não é muito antiga
-        if (proof.created) {
-            const createdDate = new Date(proof.created);
-            const now = new Date();
-            const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            if (createdDate < hourAgo) {
-                errors.push('Proof is too old (created more than 1 hour ago)');
+    validateSignature(presentation) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const errors = [];
+            if (!presentation.proof) {
+                errors.push('Missing proof object');
+                return { valid: false, errors };
             }
-            if (createdDate > now) {
-                errors.push('Proof creation date is in the future');
+            const proof = presentation.proof;
+            // Verificar campos obrigatórios da prova
+            if (!proof.type) {
+                errors.push('Missing proof type');
             }
-        }
-        // 🔥 NOVA VERIFICAÇÃO DE INTEGRIDADE
-        const integrityCheck = this.verifyDataIntegrity(presentation);
-        if (!integrityCheck.valid) {
-            errors.push(...integrityCheck.errors);
-        }
-        // Verificação criptográfica real
-        const signatureValid = await this.verifyCryptographicSignature(presentation);
-        if (!signatureValid.valid) {
-            errors.push(...signatureValid.errors);
-        }
-        return { valid: errors.length === 0, errors };
+            if (!proof.verificationMethod) {
+                errors.push('Missing verification method');
+            }
+            if (!proof.created) {
+                errors.push('Missing proof creation date');
+            }
+            if (!proof.proofPurpose) {
+                errors.push('Missing proof purpose');
+            }
+            else if (proof.proofPurpose !== 'authentication') {
+                errors.push(`Invalid proof purpose. Expected: authentication, Got: ${proof.proofPurpose}`);
+            }
+            // Verificar se a data de criação não é muito antiga
+            if (proof.created) {
+                const createdDate = new Date(proof.created);
+                const now = new Date();
+                const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+                if (createdDate < hourAgo) {
+                    errors.push('Proof is too old (created more than 1 hour ago)');
+                }
+                if (createdDate > now) {
+                    errors.push('Proof creation date is in the future');
+                }
+            }
+            // 🔥 NOVA VERIFICAÇÃO DE INTEGRIDADE
+            const integrityCheck = this.verifyDataIntegrity(presentation);
+            if (!integrityCheck.valid) {
+                errors.push(...integrityCheck.errors);
+            }
+            // Verificação criptográfica real
+            const signatureValid = yield this.verifyCryptographicSignature(presentation);
+            if (!signatureValid.valid) {
+                errors.push(...signatureValid.errors);
+            }
+            return { valid: errors.length === 0, errors };
+        });
     }
     verifyDataIntegrity(presentation) {
         const errors = [];
@@ -233,7 +247,7 @@ class Verification {
     checkPresentationIntegrity(presentation) {
         try {
             // Criar uma cópia da apresentação sem a prova para calcular o hash
-            const presentationWithoutProof = { ...presentation };
+            const presentationWithoutProof = Object.assign({}, presentation);
             delete presentationWithoutProof.proof;
             // Normalizar e ordenar os dados para hash consistente
             const normalizedData = this.normalizeData(presentationWithoutProof);
@@ -258,7 +272,7 @@ class Verification {
     checkCredentialIntegrity(credential) {
         try {
             // Criar uma cópia da credencial sem a prova
-            const credentialWithoutProof = { ...credential };
+            const credentialWithoutProof = Object.assign({}, credential);
             delete credentialWithoutProof.proof;
             // Calcular hash dos dados
             const normalizedData = this.normalizeData(credentialWithoutProof);
@@ -305,31 +319,33 @@ class Verification {
     extractExpectedHash(proof) {
         // Em um sistema real, o hash seria parte da assinatura criptográfica
         // Por agora, vamos simular usando um campo especial na prova
-        return proof?.dataHash || null;
+        return (proof === null || proof === void 0 ? void 0 : proof.dataHash) || null;
     }
-    async verifyCryptographicSignature(presentation) {
-        const errors = [];
-        try {
-            const proof = presentation.proof;
-            // Verificar se o verification method corresponde ao holder
-            if (proof.verificationMethod && presentation.holder) {
-                const expectedMethod = presentation.holder + '#key-1';
-                if (proof.verificationMethod !== expectedMethod) {
-                    errors.push(`Verification method mismatch. Expected: ${expectedMethod}, Got: ${proof.verificationMethod}`);
+    verifyCryptographicSignature(presentation) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const errors = [];
+            try {
+                const proof = presentation.proof;
+                // Verificar se o verification method corresponde ao holder
+                if (proof.verificationMethod && presentation.holder) {
+                    const expectedMethod = presentation.holder + '#key-1';
+                    if (proof.verificationMethod !== expectedMethod) {
+                        errors.push(`Verification method mismatch. Expected: ${expectedMethod}, Got: ${proof.verificationMethod}`);
+                    }
                 }
+                // Simular verificação de assinatura digital
+                // Em um sistema real, isso usaria a chave pública para verificar a assinatura
+                const signatureSimulation = this.simulateRealSignatureVerification(presentation);
+                if (!signatureSimulation) {
+                    errors.push('Cryptographic signature verification failed');
+                }
+                return { valid: errors.length === 0, errors };
             }
-            // Simular verificação de assinatura digital
-            // Em um sistema real, isso usaria a chave pública para verificar a assinatura
-            const signatureSimulation = this.simulateRealSignatureVerification(presentation);
-            if (!signatureSimulation) {
-                errors.push('Cryptographic signature verification failed');
+            catch (error) {
+                errors.push(`Signature verification error: ${error instanceof Error ? error.message : String(error)}`);
+                return { valid: false, errors };
             }
-            return { valid: errors.length === 0, errors };
-        }
-        catch (error) {
-            errors.push(`Signature verification error: ${error instanceof Error ? error.message : String(error)}`);
-            return { valid: false, errors };
-        }
+        });
     }
     simulateRealSignatureVerification(presentation) {
         // Simular uma verificação mais rigorosa
@@ -368,64 +384,67 @@ class Verification {
         }
         return { valid: errors.length === 0, errors };
     }
-    async validateCredentials(credentials) {
-        const errors = [];
-        const warnings = [];
-        if (!Array.isArray(credentials) || credentials.length === 0) {
-            errors.push('No valid credentials found in the presentation');
-            return { valid: false, errors, warnings };
-        }
-        for (let i = 0; i < credentials.length; i++) {
-            const credential = credentials[i];
-            // Verificar estrutura básica
-            if (!credential.type || !Array.isArray(credential.type)) {
-                errors.push(`Credential ${i} has invalid type field`);
+    validateCredentials(credentials) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const errors = [];
+            const warnings = [];
+            if (!Array.isArray(credentials) || credentials.length === 0) {
+                errors.push('No valid credentials found in the presentation');
+                return { valid: false, errors, warnings };
             }
-            else if (!credential.type.includes('VerifiableCredential')) {
-                errors.push(`Credential ${i} is missing required VerifiableCredential type`);
-            }
-            if (!credential.issuer) {
-                errors.push(`Credential ${i} is missing issuer field`);
-            }
-            if (!credential.issuanceDate) {
-                errors.push(`Credential ${i} is missing issuanceDate`);
-            }
-            // Verificar expiração
-            if (credential.expirationDate) {
-                const expiryDate = new Date(credential.expirationDate);
-                const now = new Date();
-                if (expiryDate < now) {
-                    errors.push(`Credential ${i} has expired on ${credential.expirationDate}`);
+            for (let i = 0; i < credentials.length; i++) {
+                const credential = credentials[i];
+                // Verificar estrutura básica
+                if (!credential.type || !Array.isArray(credential.type)) {
+                    errors.push(`Credential ${i} has invalid type field`);
                 }
-                else {
-                    // Aviso se está próximo da expiração (30 dias)
-                    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                    if (expiryDate < thirtyDaysFromNow) {
-                        warnings.push(`Credential ${i} will expire soon (on ${credential.expirationDate})`);
+                else if (!credential.type.includes('VerifiableCredential')) {
+                    errors.push(`Credential ${i} is missing required VerifiableCredential type`);
+                }
+                if (!credential.issuer) {
+                    errors.push(`Credential ${i} is missing issuer field`);
+                }
+                if (!credential.issuanceDate) {
+                    errors.push(`Credential ${i} is missing issuanceDate`);
+                }
+                // Verificar expiração
+                if (credential.expirationDate) {
+                    const expiryDate = new Date(credential.expirationDate);
+                    const now = new Date();
+                    if (expiryDate < now) {
+                        errors.push(`Credential ${i} has expired on ${credential.expirationDate}`);
+                    }
+                    else {
+                        // Aviso se está próximo da expiração (30 dias)
+                        const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                        if (expiryDate < thirtyDaysFromNow) {
+                            warnings.push(`Credential ${i} will expire soon (on ${credential.expirationDate})`);
+                        }
                     }
                 }
+                else {
+                    warnings.push(`Credential ${i} has no expiration date`);
+                }
+                // Verificar prova (signature)
+                if (!credential.proof) {
+                    errors.push(`Credential ${i} is missing proof`);
+                }
             }
-            else {
-                warnings.push(`Credential ${i} has no expiration date`);
-            }
-            // Verificar prova (signature)
-            if (!credential.proof) {
-                errors.push(`Credential ${i} is missing proof`);
-            }
-        }
-        return { valid: errors.length === 0, errors, warnings };
+            return { valid: errors.length === 0, errors, warnings };
+        });
     }
     // Método auxiliar para validação com contexto específico
-    async verifyPresentationWithContext(presentation, context) {
-        const result = await this.verifyPresentation(presentation, context);
-        // Verificações adicionais baseadas no contexto
-        if (context.expectedHolder && presentation.holder !== context.expectedHolder) {
-            result.errors.push(`Holder mismatch. Expected: ${context.expectedHolder}, Got: ${presentation.holder}`);
-            result.verified = false;
-        }
-        return result;
+    verifyPresentationWithContext(presentation, context) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const result = yield this.verifyPresentation(presentation, context);
+            // Verificações adicionais baseadas no contexto
+            if (context.expectedHolder && presentation.holder !== context.expectedHolder) {
+                result.errors.push(`Holder mismatch. Expected: ${context.expectedHolder}, Got: ${presentation.holder}`);
+                result.verified = false;
+            }
+            return result;
+        });
     }
 }
 exports.Verification = Verification;
 exports.default = Verification;
-//# sourceMappingURL=verification.js.map
