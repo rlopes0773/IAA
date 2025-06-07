@@ -1,0 +1,41 @@
+{
+  "name": "verifiable-credentials-eidas-project",
+  "version": "1.0.0",
+  "description": "Privacy-Preserving Authentication with Verifiable Credentials - eIDAS 2.0 aligned",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "install:all": "npm install && cd \"issuer and verifier\" && npm install && cd ../\"holder/verifiable-credentials-project\" && npm install",
+    "start": "npm run start:issuer-verifier",
+    "start:issuer-verifier": "cd \"issuer and verifier\" && npm start",
+    "start:holder": "cd \"holder/verifiable-credentials-project\" && npm start",
+    "dev:issuer-verifier": "cd \"issuer and verifier\" && npm run dev",
+    "dev:holder": "cd \"holder/verifiable-credentials-project\" && npm run dev",
+    "issue": "cd \"issuer and verifier\" && npm run issue",
+    "verify": "cd \"issuer and verifier\" && npm run verify",
+    "test": "node tests/complete-flow-test.js",
+    "test:unit": "node tests/unit-tests.js",
+    "test:integration": "node tests/integration-test.js",
+    "test:api": "node tests/api-test.js",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:api && npm run test",
+    "test:watch": "nodemon tests/complete-flow-test.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "keywords": [
+    "verifiable-credentials",
+    "eidas",
+    "privacy",
+    "authentication",
+    "did",
+    "selective-disclosure"
+  ],
+  "author": "Diogo Neto, Hugo Silva, Rúben Lopes",
+  "license": "MIT"
+}
