@@ -1,0 +1,57 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://w3id.org/security/data-integrity/v2"
+  ],
+  "type": [
+    "VerifiablePresentation"
+  ],
+  "holder": "did:key:zDnaeZvKg8cRdmFH5Xxgkqd8Pjj8VS7r3pdoGUVWTBa8bbK6i",
+  "verifiableCredential": [
+    {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://www.w3.org/2018/credentials/examples/v1",
+        "https://example.org/contexts/university-degree/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "type": [
+        "VerifiableCredential",
+        "UniversityDegreeCredential"
+      ],
+      "credentialSubject": {
+        "id": "did:student:ebfeb1f712ebc6f1c276e12ec21",
+        "name": "João Silva Santos",
+        "degree": {
+          "type": "BachelorDegree",
+          "name": "Mestrado em Cibersegurança",
+          "finalGrade": 17.5,
+          "graduationDate": "2025-06-06",
+          "institution": "Universidade de Aveiro",
+          "gradeScale": "0-20"
+        }
+      },
+      "issuanceDate": "2025-06-06T15:45:10.898Z",
+      "expirationDate": "2026-06-06T15:45:10.898Z",
+      "issuer": "did:key:zDnaeggoimTeKBmP6PRfxnepFx3pcrp1SeBeLAzKAuzujUAiw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "created": "2025-06-06T15:45:10Z",
+        "verificationMethod": "did:key:zDnaeggoimTeKBmP6PRfxnepFx3pcrp1SeBeLAzKAuzujUAiw#zDnaeggoimTeKBmP6PRfxnepFx3pcrp1SeBeLAzKAuzujUAiw",
+        "cryptosuite": "ecdsa-rdfc-2019",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zAu6AjsVxuBtFcZE7HTQTPPynYeoXT1LK9DZPKoepJC64oyDLQrN4q3cuzzgTP46HGjVuxa8BH6PZmcqL87gQsVX"
+      }
+    }
+  ],
+  "proof": {
+    "type": "DataIntegrityProof",
+    "created": "2025-06-06T15:45:40Z",
+    "verificationMethod": "did:key:zDnaeZvKg8cRdmFH5Xxgkqd8Pjj8VS7r3pdoGUVWTBa8bbK6i#zDnaeZvKg8cRdmFH5Xxgkqd8Pjj8VS7r3pdoGUVWTBa8bbK6i",
+    "cryptosuite": "ecdsa-rdfc-2019",
+    "proofPurpose": "authentication",
+    "challenge": "abc123",
+    "domain": "https://example.com/",
+    "proofValue": "z2YN2zFbM3EXUX5AwqcNDpenYzujQM8ZzoJFHgE6GySrveeWgynaGP8cXonh6TCRcMq9PtYzwt68jMmph1UkXXVqR"
+  }
+}

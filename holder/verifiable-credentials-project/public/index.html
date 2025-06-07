@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifiable Credentials Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Verifiable Credentials Project</h1>
+            <p>Visualizador de Credenciais Verificáveis</p>
+        </header>
+
+        <main>
+            <div class="tabs">
+                <button class="tab-button active" onclick="showTab('credential')">Credencial</button>
+                <button class="tab-button" onclick="showTab('presentation')">Apresentação</button>
+                <button class="tab-button" onclick="showTab('create')">Criar Nova</button>
+            </div>
+
+            <!-- Aba Credencial -->
+            <div id="credential-tab" class="tab-content active">
+                <div class="card">
+                    <h2>📄 Credencial Verificável</h2>
+                    <div class="upload-area">
+                        <input type="file" id="vc-file" accept=".json" onchange="loadCredential(event)">
+                        <label for="vc-file">Carregar vc.json</label>
+                        <p>Ou arraste o arquivo aqui</p>
+                    </div>
+                    <div id="vc-display" class="json-display"></div>
+                </div>
+            </div>
+
+            <!-- Aba Apresentação -->
+            <div id="presentation-tab" class="tab-content">
+                <div class="card">
+                    <h2>🎭 Apresentação Verificável</h2>
+                    <div class="upload-area">
+                        <input type="file" id="vp-file" accept=".json" onchange="loadPresentation(event)">
+                        <label for="vp-file">Carregar vp.json</label>
+                        <p>Ou arraste o arquivo aqui</p>
+                    </div>
+                    <div id="vp-display" class="json-display"></div>
+                </div>
+            </div>
+
+            <!-- Aba Criar Nova -->
+            <div id="create-tab" class="tab-content">
+                <div class="card">
+                    <h2>➕ Criar Nova Apresentação</h2>
+                    <form id="create-form">
+                        <div class="form-group">
+                            <label for="challenge">Challenge:</label>
+                            <input type="text" id="challenge" placeholder="abc123" value="abc123">
+                        </div>
+                        <div class="form-group">
+                            <label for="domain">Domain:</label>
+                            <input type="url" id="domain" placeholder="https://example.com/" value="https://example.com/">
+                        </div>
+                        <div class="form-group">
+                            <label for="holder-did">Holder DID (opcional):</label>
+                            <input type="text" id="holder-did" placeholder="Será gerado automaticamente">
+                        </div>
+                        <button type="submit" class="btn-primary">Criar Apresentação</button>
+                    </form>
+                    <div id="create-result" class="result-area"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "name": "http://schema.org/name",
+    "description": "http://schema.org/description",
+    "institution": "http://schema.org/educationalOrganization",
+    "finalGrade": "http://schema.org/grade",
+    "graduationDate": "http://schema.org/dateCompleted",
+    "gradeScale": "http://schema.org/gradeScale",
+    "UniversityDegreeCredential": "https://example.org/examples#UniversityDegreeCredential",
+    "degree": {
+      "@id": "https://example.org/examples#degree",
+      "@type": "@id"
+    },
+    "student": {
+      "@id": "https://example.org/examples#student",
+      "@type": "@id"
+    }
+  }
+}
