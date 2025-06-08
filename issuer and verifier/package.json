@@ -22,7 +22,9 @@
     "@digitalbazaar/eddsa-2022-cryptosuite": "^1.0.0",
     "@digitalbazaar/security-document-loader": "^3.0.1",
     "@digitalbazaar/vc": "^7.2.0",
-    "express": "^4.21.2"
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

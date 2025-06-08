@@ -1,0 +1,27 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "name": "https://schema.org/name",
+    "birthDate": "https://schema.org/birthDate",
+    "nationality": "https://schema.org/nationality",
+    "certificationInfo": {
+      "@id": "https://example.org/certificationInfo",
+      "@context": {
+        "degreeName": "https://schema.org/name",
+        "institution": "https://schema.org/educationalOrganization", 
+        "finalGrade": "https://schema.org/Number",
+        "graduationDate": "https://schema.org/dateCreated",
+        "certifiedAt": "https://schema.org/dateCreated"
+      }
+    },
+    "PersonalDataCredential": {
+      "@id": "https://example.org/PersonalDataCredential",
+      "@context": {
+        "name": "https://schema.org/name",
+        "birthDate": "https://schema.org/birthDate",
+        "nationality": "https://schema.org/nationality",
+        "certificationInfo": "https://example.org/certificationInfo"
+      }
+    }
+  }
+}

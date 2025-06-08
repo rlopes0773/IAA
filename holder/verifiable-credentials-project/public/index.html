@@ -18,54 +18,190 @@
                 <button class="tab-button active" onclick="showTab('credential')">Credencial</button>
                 <button class="tab-button" onclick="showTab('presentation')">Apresentação</button>
                 <button class="tab-button" onclick="showTab('create')">Criar Nova</button>
+                <button class="tab-button" onclick="showTab('certifications')">Certificações</button> <!-- NOVA ABA -->
             </div>
 
             <!-- Aba Credencial -->
             <div id="credential-tab" class="tab-content active">
                 <div class="card">
-                    <h2>📄 Credencial Verificável</h2>
+                    <h2>📄 Credenciais Verificáveis</h2>
+                    
+                    <!-- Upload de credencial -->
                     <div class="upload-area">
                         <input type="file" id="vc-file" accept=".json" onchange="loadCredential(event)">
-                        <label for="vc-file">Carregar vc.json</label>
+                        <label for="vc-file">Carregar credencial (.json)</label>
                         <p>Ou arraste o arquivo aqui</p>
                     </div>
-                    <div id="vc-display" class="json-display"></div>
+                    
+                    <!-- Lista de credenciais -->
+                    <div class="credentials-section">
+                        <h3>🗂️ Minhas Credenciais</h3>
+                        <div class="debug-section">
+                            <button onclick="debugCredentials()" class="btn-small">🔍 Debug Storage</button>
+                        </div>
+                        <div id="credentials-list" class="credentials-list">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
+                    
+                    <!-- Display da credencial selecionada -->
+                    <div class="credential-display-section">
+                        <h3>👁️ Visualização</h3>
+                        <div id="vc-display" class="json-display"></div>
+                    </div>
+                    
+                    <!-- Seção de criação de VP melhorada -->
+                    <div id="vp-creation-section" style="display: none; margin-top: 20px;">
+                        <h3>🎭 Criar Apresentação Verificável</h3>
+                        <div class="vp-selection-info">
+                            <p id="selected-credentials-count">0 credenciais selecionadas</p>
+                            <div class="selected-credentials-summary">
+                                <h4>Credenciais que serão incluídas:</h4>
+                                <ul id="selected-credentials-list"></ul>
+                            </div>
+                            <small>Selecione as credenciais que deseja incluir na apresentação usando as caixas de seleção acima.</small>
+                        </div>
+                        
+                        <form id="create-vp-form">
+                            <div class="form-group">
+                                <label for="vp-custom-name">Nome da Apresentação (opcional):</label>
+                                <input type="text" id="vp-custom-name" placeholder="Ex: VP para Universidade ABC">
+                            </div>
+                            <div class="form-group">
+                                <label for="vp-challenge">Challenge:</label>
+                                <input type="text" id="vp-challenge" value="abc123" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="vp-domain">Domain:</label>
+                                <input type="text" id="vp-domain" value="https://example.com/" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="vp-holder-did">Holder DID (opcional):</label>
+                                <input type="text" id="vp-holder-did" placeholder="did:key:...">
+                            </div>
+                            <button type="submit" class="btn-primary">Criar Apresentação com Credenciais Selecionadas</button>
+                        </form>
+                        <div id="vp-creation-result" class="result-area"></div>
+                    </div>
                 </div>
             </div>
 
             <!-- Aba Apresentação -->
             <div id="presentation-tab" class="tab-content">
                 <div class="card">
-                    <h2>🎭 Apresentação Verificável</h2>
+                    <h2>🎭 Apresentações Verificáveis</h2>
+                    
+                    <!-- Upload de apresentação -->
                     <div class="upload-area">
                         <input type="file" id="vp-file" accept=".json" onchange="loadPresentation(event)">
-                        <label for="vp-file">Carregar vp.json</label>
-                        <p>Ou arraste o arquivo aqui</p>
+                        <label for="vp-file" class="upload-label">
+                            📁 Carregar Apresentação (.json)
+                            <span class="upload-hint">Clique aqui ou arraste o arquivo</span>
+                        </label>
                     </div>
-                    <div id="vp-display" class="json-display"></div>
+                    
+                    <!-- Lista de apresentações -->
+                    <div class="presentations-section">
+                        <h3>🗂️ Minhas Apresentações</h3>
+                        <div class="debug-section">
+                            <button onclick="debugFiles()" class="btn-small">🔍 Debug Ficheiros</button>
+                            <button onclick="cleanupOrphanFiles()" class="btn-small btn-danger">🧹 Limpar Órfãos</button>
+                        </div>
+                        <div id="presentations-list" class="presentations-list">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
+                    
+                    <!-- Display da apresentação selecionada -->
+                    <div class="presentation-display-section" style="display: block;">
+                        <h3>👁️ Visualização da Apresentação</h3>
+                        <div class="display-container">
+                            <div id="vp-display" class="json-display" style="min-height: 200px; border: 2px dashed #ddd; padding: 20px; border-radius: 8px;">
+                                <p class="placeholder-text">Selecione uma apresentação acima ou carregue um arquivo para visualizar</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Aba Criar Nova -->
             <div id="create-tab" class="tab-content">
                 <div class="card">
-                    <h2>➕ Criar Nova Apresentação</h2>
-                    <form id="create-form">
+                    <h2>➕ Solicitar Credencial de Dados Pessoais</h2>
+                    <form id="personal-data-form">
                         <div class="form-group">
-                            <label for="challenge">Challenge:</label>
-                            <input type="text" id="challenge" placeholder="abc123" value="abc123">
+                            <label for="holder-id">Seu DID:</label>
+                            <input type="text" id="holder-id" value="did:example:holder" required>
                         </div>
                         <div class="form-group">
-                            <label for="domain">Domain:</label>
-                            <input type="url" id="domain" placeholder="https://example.com/" value="https://example.com/">
+                            <label for="holder-name">Nome:</label>
+                            <input type="text" id="holder-name" value="João Silva" required>
                         </div>
                         <div class="form-group">
-                            <label for="holder-did">Holder DID (opcional):</label>
-                            <input type="text" id="holder-did" placeholder="Será gerado automaticamente">
+                            <label for="holder-birthdate">Data de Nascimento:</label>
+                            <input type="date" id="holder-birthdate" value="1990-01-01" required>
                         </div>
-                        <button type="submit" class="btn-primary">Criar Apresentação</button>
+                        <div class="form-group">
+                            <label for="holder-nationality">Nacionalidade:</label>
+                            <input type="text" id="holder-nationality" value="Portuguese" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Solicitar Credencial</button>
                     </form>
-                    <div id="create-result" class="result-area"></div>
+                    <div id="personal-data-result" class="result-area"></div>
+                </div>
+            </div>
+
+            <!-- Nova Aba Certificações -->
+            <div id="certifications-tab" class="tab-content">
+                <div class="card">
+                    <h2>🎓 Solicitar Certificação</h2>
+                    <p>Use sua credencial de dados pessoais para solicitar uma certificação acadêmica.</p>
+                    
+                    <!-- Passo 1: Verificar VC de dados pessoais -->
+                    <div id="check-personal-vc" class="section">
+                        <h3>1. Verificar Credencial Pessoal</h3>
+                        <button id="check-vc-btn" class="btn-secondary">Verificar VC de Dados Pessoais</button>
+                        <div id="vc-status" class="status-message"></div>
+                    </div>
+
+                    <!-- Passo 2: Solicitar certificação -->
+                    <div id="request-certification" class="section" style="display: none;">
+                        <h3>2. Dados da Certificação</h3>
+                        <form id="certification-form">
+                            <div class="form-group">
+                                <label for="cert-degree-name">Nome do Grau:</label>
+                                <input type="text" id="cert-degree-name" value="Mestrado em Cibersegurança" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cert-institution">Instituição:</label>
+                                <input type="text" id="cert-institution" value="Universidade de Aveiro" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cert-final-grade">Nota Final:</label>
+                                <input type="number" id="cert-final-grade" min="0" max="20" step="0.1" value="17.5" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cert-graduation-date">Data de Graduação:</label>
+                                <input type="date" id="cert-graduation-date" required>
+                            </div>
+                            <button type="submit" class="btn-primary">Solicitar Challenge</button>
+                        </form>
+                        <div id="certification-result" class="result-area"></div>
+                    </div>
+
+                    <!-- Passo 3: Autenticação com VP -->
+                    <div id="authentication-step" class="section" style="display: none;">
+                        <h3>3. Autenticação</h3>
+                        <div id="challenge-info" class="info-box"></div>
+                        <button id="authenticate-btn" class="btn-primary">Autenticar e Solicitar Certificação</button>
+                        <div id="authentication-result" class="result-area"></div>
+                    </div>
+
+                    <!-- Passo 4: Resultado -->
+                    <div id="certification-complete" class="section" style="display: none;">
+                        <h3>4. Certificação Emitida</h3>
+                        <div id="final-result" class="result-area"></div>
+                    </div>
                 </div>
             </div>
         </main>

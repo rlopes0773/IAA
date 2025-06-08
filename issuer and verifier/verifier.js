@@ -1,145 +1,149 @@
 import * as DidKey from '@digitalbazaar/did-method-key';
-import * as DidWeb from '@digitalbazaar/did-method-web';
 import * as EcdsaMultikey from '@digitalbazaar/ecdsa-multikey';
-import {
-  cryptosuite as ecdsaRdfc2019Cryptosuite
-} from '@digitalbazaar/ecdsa-rdfc-2019-cryptosuite';
-
+import { cryptosuite as ecdsaRdfc2019Cryptosuite } from '@digitalbazaar/ecdsa-rdfc-2019-cryptosuite';
 import * as vc from '@digitalbazaar/vc';
-import {CachedResolver} from '@digitalbazaar/did-io';
-import {DataIntegrityProof} from '@digitalbazaar/data-integrity';
-import {securityLoader} from '@digitalbazaar/security-document-loader';
-import {contexts as diContexts} from '@digitalbazaar/data-integrity-context';
+import { CachedResolver } from '@digitalbazaar/did-io';
+import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
+import { securityLoader } from '@digitalbazaar/security-document-loader';
+import { contexts as diContexts } from '@digitalbazaar/data-integrity-context';
 import fs from 'fs';
 import { webcrypto } from 'node:crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Global setup
+globalThis.crypto = webcrypto;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Make crypto available globally
-globalThis.crypto = webcrypto;
-
-// setup documentLoader with security contexts
+// Document loader setup
 const loader = securityLoader();
-loader.addDocuments({documents: diContexts});
+loader.addDocuments({ documents: diContexts });
 
-//Load the JSON-LD contexts
-loader.addStatic(
-  "https://www.w3.org/ns/odrl.jsonld",
-  await fetch("https://www.w3.org/ns/odrl.jsonld").then(res => res.json())
-);
+// Load external contexts
+const contextUrls = [
+    "https://www.w3.org/ns/odrl.jsonld",
+    "https://www.w3.org/2018/credentials/examples/v1"
+];
 
-loader.addStatic(
-  "https://www.w3.org/2018/credentials/examples/v1",
-  await fetch("https://www.w3.org/2018/credentials/examples/v1").then(res => res.json())
-);
-
-// Load custom university degree context
-const universityDegreeContext = JSON.parse(
-  fs.readFileSync(path.join(__dirname, 'contexts', 'university-degree-v1.json'), 'utf8')
-);
-
-loader.addStatic(
-  "https://example.org/contexts/university-degree/v1",
-  universityDegreeContext
-);
-
-const resolver = new CachedResolver();
-const didKeyDriverMultikey = DidKey.driver();
-const didWebDriver = DidWeb.driver();
-
-// Only configure P-256 support (zDna header)
-didKeyDriverMultikey.use({
-  multibaseMultikeyHeader: 'zDna',
-  fromMultibase: EcdsaMultikey.from
-});
-
-didWebDriver.use({
-  multibaseMultikeyHeader: 'zDna',
-  fromMultibase: EcdsaMultikey.from
-});
-
-resolver.use(didKeyDriverMultikey);
-resolver.use(didWebDriver);
-loader.setDidResolver(resolver);
-
-const documentLoader = loader.build();
-
-//Verifies a VC PRESENTATION 
-async function main({verifyablePresentation, documentLoader, challenge, domain}) {
-  console.log('Starting verification with challenge:', challenge, 'domain:', domain);
-  
-  try {
-    // Read the VP to get the holder DID
-    const holderDid = verifyablePresentation.holder;
-    console.log('Holder DID:', holderDid);
-
-    // Setup verification suite
-    const vpVerifyingSuite = new DataIntegrityProof({
-      cryptosuite: ecdsaRdfc2019Cryptosuite
-    });
-
-    console.log('Verifying presentation using document loader...');
-
-    // Verify signed presentation directly
-    const verifyPresentationResult = await vc.verify({
-      presentation: verifyablePresentation,
-      challenge,
-      domain,
-      suite: vpVerifyingSuite,
-      documentLoader
-    });
-
-    console.log('VERIFY PRESENTATION RESULT:');
-    console.log(JSON.stringify(verifyPresentationResult, null, 2));
-    
-    if(verifyPresentationResult.error) {
-      console.log('VP ERROR DETAILS:', verifyPresentationResult.error);
-      if(verifyPresentationResult.error.errors) {
-        verifyPresentationResult.error.errors.forEach((err, index) => {
-          console.log(`Error ${index}:`, err.message);
-          if(err.stack) console.log('Stack:', err.stack);
-        });
-      }
+for (const url of contextUrls) {
+    try {
+        const context = await fetch(url).then(res => res.json());
+        loader.addStatic(url, context);
+    } catch (error) {
+        console.warn(`Failed to load context ${url}:`, error.message);
     }
-
-    // Add result output for API
-    console.log('Verification result:', JSON.stringify(verifyPresentationResult));
-    console.log('Presentation verified:', verifyPresentationResult.verified);
-    
-    return verifyPresentationResult;
-    
-  } catch (error) {
-    console.error('Error in verification:', error);
-    throw error;
-  }
 }
 
-console.log("Loading VP file");
-try {
-  const vpFile = process.env.VP_FILE || 'vp.json';
-  
-  let verifyablePresentation;
-  try {
-    verifyablePresentation = JSON.parse(fs.readFileSync(vpFile, 'utf8'));
-  } catch (error) {
-    console.error(`Error loading ${vpFile}:`, error.message);
-    console.log('Please provide a verifiable presentation to verify.');
-    process.exit(1);
-  }
+// Load university degree context
+const universityDegreeContext = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'contexts', 'university-degree-v1.json'), 'utf8')
+);
+loader.addStatic("./contexts/university-degree-v1.json", universityDegreeContext);
+console.log('✅ Loaded university degree context');
 
-  if (verifyablePresentation) {
-    console.log("Verifying Verifiable Presentation");
-    const challenge = process.env.VERIFY_CHALLENGE || 'abc123';
-    const domain = process.env.VERIFY_DOMAIN || 'https://example.com/';
+// Load personal data context
+const personalDataContext = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'contexts', 'personal-data-v1.json'), 'utf8')
+);
+loader.addStatic("./contexts/personal-data-v1.json", personalDataContext);
+console.log('✅ Loaded personal data context');
+
+// DID resolver setup
+const resolver = new CachedResolver();
+const didKeyDriver = DidKey.driver();
+
+didKeyDriver.use({
+    multibaseMultikeyHeader: 'zDna',
+    fromMultibase: EcdsaMultikey.from
+});
+
+resolver.use(didKeyDriver);
+loader.setDidResolver(resolver);
+const documentLoader = loader.build();
+
+// Verify presentation
+async function verifyPresentation({ verifiablePresentation, challenge, domain, documentLoader }) {
+    console.log('Starting verification with:', { challenge, domain });
+    console.log('Holder DID:', verifiablePresentation.holder);
+
+    try {
+        // Setup verification suite
+        const vpVerifyingSuite = new DataIntegrityProof({
+            cryptosuite: ecdsaRdfc2019Cryptosuite
+        });
+
+        console.log('Verifying presentation...');
+
+        // Verify presentation
+        const verifyPresentationResult = await vc.verify({
+            presentation: verifiablePresentation,
+            challenge,
+            domain,
+            suite: vpVerifyingSuite,
+            documentLoader
+        });
+
+        console.log('VERIFY PRESENTATION RESULT:');
+        console.log(JSON.stringify(verifyPresentationResult, null, 2));
+
+        if (verifyPresentationResult.error) {
+            console.log('VP ERROR DETAILS:', verifyPresentationResult.error);
+            if (verifyPresentationResult.error.errors) {
+                verifyPresentationResult.error.errors.forEach((err, index) => {
+                    console.log(`Error ${index}:`, err.message);
+                });
+            }
+        }
+
+        // Output result for API parsing
+        console.log('Verification result:', JSON.stringify(verifyPresentationResult));
+        console.log('Presentation verified:', verifyPresentationResult.verified);
+
+        return verifyPresentationResult;
+
+    } catch (error) {
+        console.error('Error in verification:', error);
+        throw error;
+    }
+}
+
+// Main execution
+async function main() {
+    console.log("Loading VP file");
     
-    await main({verifyablePresentation, documentLoader, challenge, domain});  
-  } else {
-    console.log("VP not found or invalid");
-  }
-} catch (error) {
-  console.error("Error loading or processing VP:", error);
-  process.exit(1);
+    try {
+        const vpFile = process.env.VP_FILE || 'vp.json';
+        const challenge = process.env.VERIFY_CHALLENGE || 'abc123';
+        const domain = process.env.VERIFY_DOMAIN || 'https://example.com/';
+
+        let verifiablePresentation;
+        try {
+            verifiablePresentation = JSON.parse(fs.readFileSync(vpFile, 'utf8'));
+        } catch (error) {
+            console.error(`Error loading ${vpFile}:`, error.message);
+            console.log('Please provide a verifiable presentation to verify.');
+            process.exit(1);
+        }
+
+        if (verifiablePresentation) {
+            console.log("Verifying Verifiable Presentation");
+            await verifyPresentation({
+                verifiablePresentation,
+                challenge,
+                domain,
+                documentLoader
+            });
+        } else {
+            console.log("VP not found or invalid");
+        }
+    } catch (error) {
+        console.error("Error loading or processing VP:", error);
+        process.exit(1);
+    }
+}
+
+// Execute if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+    main();
 }
