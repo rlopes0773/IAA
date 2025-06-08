@@ -3,76 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifiable Credentials - Issuer/Verifier</title>
+    <title>Verifiable Credentials - Verifier</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <h1>Sistema de Credenciais Verificáveis</h1>
-        <p class="subtitle">Issuer & Verifier</p>
+        <h1>🔍 Verificador de Credenciais Verificáveis</h1>
+        <p class="subtitle">Sistema de Verificação de Apresentações Verificáveis (VP)</p>
         
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab-button active" data-tab="issuer">Issuer</button>
-            <button class="tab-button" data-tab="verifier">Verifier</button>
+        <!-- Conteúdo principal - apenas Verifier -->
+        <div class="main-content">
+            <div class="verifier-section">
+                <h2>Verificar Apresentação Verificável</h2>
+                <p>Cole o JSON de uma apresentação verificável (VP) para verificar sua autenticidade e integridade.</p>
+                
+                <form id="verifier-form">
+                    <div class="form-group">
+                        <label for="presentation-json">JSON da Apresentação Verificável:</label>
+                        <textarea id="presentation-json" rows="15" placeholder="Cole aqui o JSON completo da apresentação verificável..." required></textarea>
+                        <small>Cole o JSON completo da VP que deseja verificar</small>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="verify-challenge">Challenge:</label>
+                            <input type="text" id="verify-challenge" value="abc123" required>
+                            <small>Challenge usado na criação da VP</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="verify-domain">Domain:</label>
+                            <input type="text" id="verify-domain" value="https://example.com/" required>
+                            <small>Domain usado na criação da VP</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-verify">🔍 Verificar Apresentação</button>
+                </form>
+                
+                <div id="verifier-result" class="result-box"></div>
+            </div>
         </div>
 
-        <!-- Issuer Tab -->
-        <div id="issuer" class="tab-content active">
-            <h2>Emitir Credencial</h2>
-            <form id="issuer-form">
-                <div class="form-group">
-                    <label for="student-id">ID do Estudante:</label>
-                    <input type="text" id="student-id" value="did:student:ebfeb1f712ebc6f1c276e12ec21" required>
-                </div>
-                <div class="form-group">
-                    <label for="student-name">Nome do Estudante:</label>
-                    <input type="text" id="student-name" value="João Silva Santos" required>
-                </div>
-                <div class="form-group">
-                    <label for="degree-name">Nome do Grau:</label>
-                    <input type="text" id="degree-name" value="Mestrado em Cibersegurança" required>
-                </div>
-                <div class="form-group">
-                    <label for="final-grade">Nota Final:</label>
-                    <input type="number" id="final-grade" min="0" max="20" step="0.1" value="17.5" required>
-                    <small>Escala de 0 a 20</small>
-                </div>
-                <div class="form-group">
-                    <label for="graduation-date">Data de Graduação:</label>
-                    <input type="date" id="graduation-date" required>
-                </div>
-                <div class="form-group">
-                    <label for="institution">Instituição:</label>
-                    <input type="text" id="institution" value="Universidade de Aveiro" required>
-                </div>
-                <button type="submit">Emitir Credencial</button>
-            </form>
-            <div id="issuer-result" class="result-box"></div>
-        </div>
-
-        <!-- Verifier Tab -->
-        <div id="verifier" class="tab-content">
-            <h2>Verificar Apresentação</h2>
-            <form id="verifier-form">
-                <div class="form-group">
-                    <label for="presentation-json">Apresentação Verificável (JSON):</label>
-                    <textarea id="presentation-json" rows="10" placeholder="Cole aqui o JSON da apresentação verificável..." required></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="verify-challenge">Challenge:</label>
-                    <input type="text" id="verify-challenge" value="abc123" required>
-                </div>
-                <div class="form-group">
-                    <label for="verify-domain">Domain:</label>
-                    <input type="text" id="verify-domain" value="https://example.com/" required>
-                </div>
-                <button type="submit">Verificar Apresentação</button>
-            </form>
-            <div id="verifier-result" class="result-box"></div>
-        </div>
-
-        <!-- Status -->
+        <!-- Status (opcional) -->
         <div id="status" class="status-box"></div>
     </div>
 
